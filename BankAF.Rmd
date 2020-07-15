@@ -1,0 +1,208 @@
+---
+title: "First Pass EDA"
+author: "Adam Canton"
+date: "7/15/2020"
+output: html_document
+---
+# To DO:
+  - Missing Data?
+    - Nope! NICE
+  - Summary Stats and Distributions for all variables
+  - Correlations with response and each other (multicollinearity)
+  - Anything look like it needs a transform or a scaling?
+  - Create any categoricals or other custom features
+
+```{r setup, include=FALSE}
+library(magrittr)
+library(dplyr)
+library(tidyverse)
+library(olsrr)
+library(ggplot2)
+library(ggcorrplot)
+library(GGally)
+library(naniar)
+library(reshape2)
+library(ggthemes)
+library(cowplot)
+```
+
+```{r}
+# Grab the file Bank Additional Full
+BankAF <- read.csv(file = "F:/R For Real/Stats-2-Project-2/bank-additional-full.csv", sep = ";", header = TRUE)
+
+# Change the name of the response from y to Subscription
+names(BankAF)[21] <- "Subscription"
+
+#Maybe a new categorical for pdays: New contact v Old contact
+
+```
+
+```{r}
+str(BankAF)
+```
+
+```{r}
+# No Apparent NA Values, need to check for other NA identifiers
+gg_miss_var(BankAF)
+
+na_count <- sapply(BankAF, function(y) sum(length(which(is.na(y)))))
+na_count <- data.frame(na_count)
+na_count
+```
+
+
+```{r, warning=FALSE}
+# Age ----
+# The Nos have a massive cut-off around 60 years old. Makes sense these at older ages you would be less interested in getting a TD, than having one already   # payout.
+# The median age for yes is actually younger than no
+
+g1 = BankAF %>% ggplot(aes(x = age)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+  facet_wrap(facets = BankAF$Subscription) + xlab("Age") + coord_flip()
+
+g2 = BankAF %>% ggplot(aes(x = age, fill = Subscription)) + geom_histogram(binwidth = 1) + facet_wrap(~BankAF$Subscription) +
+  labs(fill = "Subscription") + xlab("Age") + theme(legend.position = "none")
+
+g3 = BankAF %>% group_by(Subscription) %>% summarise(MeanAge = mean(age), Count = n()) %>% ggplot(aes(x = Subscription, y = MeanAge, fill = Subscription)) +
+  geom_col(width = 0.5) + geom_text(aes(label = round(MeanAge,2)), vjust = -0.5, size = 3) + scale_y_continuous(limits = c(0,50), expand = c(0,0)) +
+  theme(legend.position = "none", axis.title.x = element_blank())
+
+g4 = BankAF %>% group_by(Subscription) %>% summarise(MedAge = median(age)) %>% ggplot(aes(x = Subscription, y = MedAge, fill = Subscription)) +
+  geom_col(width = 0.5) + geom_text(aes(label = round(MedAge,2)), vjust = -0.5, size = 3) + scale_y_continuous(limits = c(0,50), expand = c(0,0)) +
+  theme(legend.position = "none", axis.title.x = element_blank())
+
+g6 = BankAF %>% ggplot(aes(sample = age)) + stat_qq_line() + stat_qq() + xlab("Quantile") + ylab("Age")
+
+g5 = ggdraw() + draw_label(sprintf("Summary and Distribution\n of Age:\nMin - %s\n1st Qu. - %s\nMedian - %s\nMean - %s\n3rd Qu. - %s\nMax - %s",min(BankAF$age),summary(BankAF$age)[2], median(BankAF$age), round(mean(BankAF$age),2), summary(BankAF$age)[5], max(BankAF$age)))
+
+
+
+plot_grid(g1,g6,g4,g2,g5,g3, ncol = 3, nrow = 2)
+```
+
+```{r}
+# Duration ---- 
+# This will get discarded in final, only here for benchmarking
+# From Source Material - duration: last contact duration, in seconds (numeric). Important note: this attribute highly affects the output target (e.g., if     # duration=0 then y='no'). Yet, the duration is not known before a call is performed. Also, after the end of the call y is obviously known. Thus, this input  # should only be included for benchmark purposes and should be discarded if the intention is to have a realistic predictive model.
+
+summary(BankAF$duration)
+sd(BankAF$duration)
+
+BankAF %>% ggplot(aes(x = duration)) + geom_boxplot() + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank()) + 
+  facet_wrap(facets = BankAF$Subscription) + xlab("Duration")
+
+BankAF %>% ggplot(aes(x = duration, fill = Subscription)) + geom_histogram(binwidth = 50) + facet_grid(rows = BankAF$Subscription) +
+  labs(fill = "Subscription") + xlab("Duration")
+
+BankAF %>% group_by(Subscription) %>% summarise(MeanDuration = mean(duration), Count = n()) %>% 
+  ggplot(aes(x = Subscription, y = MeanDuration, fill = Subscription)) + geom_col(width = 0.5) + 
+  geom_text(aes(label = round(MeanDuration,2)), vjust = -0.5, size = 3) + scale_y_continuous(limits = c(0,600), expand = c(0,0)) +
+  theme(legend.position = "none", axis.title.x = element_blank())
+
+BankAF %>% group_by(Subscription) %>% summarise(MedDuration = median(duration)) %>% ggplot(aes(x = Subscription, y = MedDuration, fill = Subscription)) +
+  geom_col(width = 0.5) + geom_text(aes(label = round(MedDuration,2)), vjust = -0.5, size = 3) 
+
+```
+
+```{r}
+# Campaign ----
+# campaign: number of contacts performed during this campaign and for this client (numeric, includes last contact)
+# Heavily right skewed
+# Largest number of contacts by far is one
+# ~ 98% of campaigns make between 1-10 phone calls, thus ~ 2% of campaigns require more than 10 calls
+
+summary(BankAF$campaign)
+sd(BankAF$campaign)
+
+g1 = BankAF %>% ggplot(aes(x = campaign, fill = Subscription)) + geom_boxplot() + 
+  theme(axis.text.y = element_blank(), 
+        axis.ticks.y = element_blank(),axis.title.x = element_blank(),
+        legend.position = "none") + 
+  facet_grid(rows = BankAF$Subscription)
+
+g2 = BankAF %>% ggplot(aes(x = campaign, fill = Subscription)) + geom_histogram(binwidth = 1) + facet_grid(rows = BankAF$Subscription) + xlab("Campaign") +
+  theme(legend.position = "none", axis.title.y = element_blank()) + scale_y_continuous(position = "right") + scale_x_continuous(limits = c(0,60))
+
+g3 = BankAF %>% group_by(campaign) %>% summarize(Count = n()) %>% ggplot(aes(x = campaign, y = Count)) + geom_col() + ggtitle("Frequency of Campaign") + 
+  geom_text(aes(label = Count), vjust = -0.5, size = 1.5) +scale_y_continuous(limits = c(0,20000), expand = c(0,0)) + 
+  scale_x_continuous(limits = c(0, 60), expand = c(0,0)) + xlab("Campaign")
+
+# Not super useful atm
+#g4 = BankAF %>% ggplot(aes(sample = campaign)) + stat_qq_line() + stat_qq() + xlab("Quantile") + ylab("Campaign")
+
+g5 = ggdraw() + 
+  draw_label(sprintf("Summary and Distribution\nof Campaign:\nMin -  %s\n1st Qu. - %s\nMedian - %s\nMean - %s\n3rd Qu. - %s\nMax - %s",
+                     summary(BankAF$campaign)[1], summary(BankAF$campaign)[2],
+                     summary(BankAF$campaign)[3],round(summary(BankAF$campaign)[4],2),
+                     summary(BankAF$campaign)[5],summary(BankAF$campaign)[6]))
+
+plot_grid(g1,NULL,NULL,g3,g2,NULL,NULL,g5, ncol = 4, nrow = 2, align = "h", rel_widths = c(2,0,0,3))
+```
+
+```{r, warning=FALSE}
+# Pdays ----
+# Not a lot of info here as far as distirbution. Nearly all (39,673) are new contacts, 1,515 are previous contacts.
+# Showing the frequency of days since last contact from previous campaigns to previously contacted clients
+
+summary(BankAF$pdays)
+
+BankAF %>% group_by(pdays) %>% summarize(Count = n()) %>% ggplot(aes(x = pdays, y = Count)) + geom_col() +
+  ggtitle("Frequency of Pdays - Old Customers") + geom_text(aes(label = Count), vjust = -0.5, size = 2) + 
+  scale_y_continuous(limits = c(0,1000), expand = c(0,0)) + scale_x_continuous(limits = c(0, 35), expand = c(0,0))
+
+BankAF %>% mutate(pdays = ifelse(BankAF$pdays >= 30,30,pdays)) %>% group_by(pdays) %>% summarise(Count = n()) %>% ggplot(aes(x = pdays, y = Count)) +
+  geom_col() + geom_text(aes(label = Count), vjust = -0.5, size = 3) + ggtitle("Pdays All Clients") + xlab('Pdays (30 indicates new contact)')
+```
+```{r}
+# Previous ----
+# previous: number of contacts performed before this campaign and for this client (numeric)
+# 
+summary(BankAF$previous)
+
+BankAF %>% ggplot(aes(x = previous)) + geom_boxplot() + facet_grid(rows = BankAF$Subscription)
+
+BankAF %>% group_by(previous, Subscription) %>% summarise(Count = n(), .groups = "drop") %>% ggplot(aes(x = previous, y = Count, fill = Subscription)) +
+  geom_col(width = 0.5) + geom_text(aes(label = Count), vjust = -0.5, size = 3) + facet_wrap(~Subscription) + theme(legend.position = "none")
+
+```
+
+```{r}
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
