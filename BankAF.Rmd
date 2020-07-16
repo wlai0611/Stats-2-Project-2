@@ -24,6 +24,7 @@ library(naniar)
 library(reshape2)
 library(ggthemes)
 library(cowplot)
+library(aod)
 ```
 
 ```{r}
@@ -142,23 +143,27 @@ plot_grid(g1,NULL,NULL,g3,g2,NULL,NULL,g5, ncol = 4, nrow = 2, align = "h", rel_
 # Pdays ----
 # Not a lot of info here as far as distirbution. Nearly all (39,673) are new contacts, 1,515 are previous contacts.
 # Showing the frequency of days since last contact from previous campaigns to previously contacted clients
+# Changed the 999 code to 30 in the last graphic to make it easier to visualize
 
 summary(BankAF$pdays)
 
 BankAF %>% group_by(pdays) %>% summarize(Count = n()) %>% ggplot(aes(x = pdays, y = Count)) + geom_col() +
   ggtitle("Frequency of Pdays - Old Customers") + geom_text(aes(label = Count), vjust = -0.5, size = 2) + 
-  scale_y_continuous(limits = c(0,1000), expand = c(0,0)) + scale_x_continuous(limits = c(0, 35), expand = c(0,0))
+  scale_y_continuous(limits = c(0,1000), expand = c(0,0)) + scale_x_continuous(limits = c(0, 35), expand = c(0,0)) + 
+  theme(legend.position = "none")
 
-BankAF %>% mutate(pdays = ifelse(BankAF$pdays >= 30,30,pdays)) %>% group_by(pdays) %>% summarise(Count = n()) %>% ggplot(aes(x = pdays, y = Count)) +
-  geom_col() + geom_text(aes(label = Count), vjust = -0.5, size = 3) + ggtitle("Pdays All Clients") + xlab('Pdays (30 indicates new contact)')
+BankAF %>% mutate(pdays = ifelse(BankAF$pdays >= 30,30,pdays)) %>% group_by(pdays, Subscription) %>% summarise(Count = n()) %>%
+  ggplot(aes(x = pdays, y = Count, fill = Subscription)) + geom_col() + geom_text(aes(label = Count), vjust = -0.5, size = 3) + 
+  ggtitle("Pdays All Clients") + xlab('Pdays (30 indicates new contact)') 
 ```
 ```{r}
 # Previous ----
 # previous: number of contacts performed before this campaign and for this client (numeric)
 # 
+
 summary(BankAF$previous)
 
-BankAF %>% ggplot(aes(x = previous)) + geom_boxplot() + facet_grid(rows = BankAF$Subscription)
+BankAF %>% ggplot(aes(x = previous, fill = Subscription)) + geom_boxplot() + facet_grid(rows = BankAF$Subscription)
 
 BankAF %>% group_by(previous, Subscription) %>% summarise(Count = n(), .groups = "drop") %>% ggplot(aes(x = previous, y = Count, fill = Subscription)) +
   geom_col(width = 0.5) + geom_text(aes(label = Count), vjust = -0.5, size = 3) + facet_wrap(~Subscription) + theme(legend.position = "none")
@@ -166,12 +171,15 @@ BankAF %>% group_by(previous, Subscription) %>% summarise(Count = n(), .groups =
 ```
 
 ```{r}
-
+mylogit.1 <- glm(Subscription ~ job + marital + education + age + default + housing + pdays, data = BankAF, family = "binomial")
 
 ```
 
 
 
+```{r}
+summary(mylogit.1)
+```
 
 
 
