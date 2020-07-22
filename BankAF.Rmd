@@ -342,11 +342,21 @@ confusionMatrix(predTable$Predicted, reference = predTable$Observed)
 ```
 
 ```{r}
+# Principal Components Analysis Trial
+library(Lahman)
+numVars = c(1,12,13,14,16,17,18,19,20)
+
+BankAF.reduced <- BankAF[,numVars]
+cov(BankAF.reduced)
+
 
 ```
 
 
 
+```{r}
+
+```
 
 
 
