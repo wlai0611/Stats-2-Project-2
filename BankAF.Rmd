@@ -95,6 +95,8 @@ BankAF <- cbind(BankAF, ID)
 # Going to try to create 2 data sets, one for Subscription-yes one for Subscription-no, Sample each one proportionally then recombine into train and test sets
 BankAF.yes <- subset(BankAF, Subscription == "yes")
 BankAF.no <- subset(BankAF, Subscription == "no")
+
+
 ```
 
 ```{r}
@@ -111,6 +113,14 @@ test.no<-BankAF.no[-index.no,]
 
 BankAF.train <- rbind(train.yes, train.no)
 BankAF.test <- rbind(test.yes, test.no)
+
+# Getting rid of duration  - it will predict nearly perfectly with this in mean prediction error = 0
+# Also have to get rid of ID since it was being selected as good explanatory variable
+BankAF.train = BankAF.train %>% dplyr::select(-c(duration, ID))
+BankAF.test = BankAF.test %>% dplyr::select(-c(duration, ID))
+
+# remove intermediate data sets
+rm(test.no, test.yes, train.no, train.yes, BankAF.no, BankAF.yes)
 ```
 
 ```{r}
@@ -232,7 +242,7 @@ BankAF %>% mutate(pdays = ifelse(BankAF$pdays >= 30,30,pdays)) %>% group_by(pday
   ggtitle("Pdays All Clients") + xlab('Pdays (30 indicates new contact)') 
 
 BankAF %>% filter(BankAF$pdays == 999) %>% group_by(Subscription) %>% summarise(Count = n()) %>%
-  ggplot(aes(x = Subscription, y = Count, fill = Subscription)) + geom_col(width = 0.75) + 
+  ggplot(aes(x = Subscription, y = Count, fill = Subscription)) + geom_col(width = 0.5) + 
   ggtitle("New Contacts by Subscription Decision") + geom_text(aes(label = Count), vjust = -0.5, size = 3) + 
   theme(legend.position = "none")
 ```
@@ -252,7 +262,8 @@ BankAF %>% group_by(previous, Subscription) %>% summarise(Count = n(), .groups =
 ```
 
 ```{r}
-mylogit.1 <- glm(Subscription ~ job + marital + education + age + default + housing + pdays, data = BankAF, family = "binomial")
+library(MASS)
+mylogit.1 <- glm(Subscription ~ ., data = BankAF.train, family = binomial)
 
 ```
 
@@ -262,8 +273,36 @@ mylogit.1 <- glm(Subscription ~ job + marital + education + age + default + hous
 summary(mylogit.1)
 ```
 
+# This is a bit disheartening essentially we can reach a maximum accuracy of the data set - eg if I classify everything as no I'm right nearly 91% of the time 
+```{r}
+library(caret)
+# Make predictions
+probabilities <- mylogit.1 %>% predict(BankAF.test, type = "response")
+predicted.classes <- ifelse(probabilities > 0.3, "yes", "no")
+# Model accuracy
+mean(predicted.classes==BankAF.test$Subscription)
 
+predTable <- tibble(Predicted = as.factor(predicted.classes), Observed = BankAF.test$Subscription)
 
+confusionMatrix(predTable$Predicted, reference = predTable$Observed)
+```
+
+```{r}
+step.model <- mylogit.1 %>% stepAIC(trace = FALSE)
+coef(step.model)
+```
+
+```{r}
+# Make predictions
+probabilities <- step.model %>% predict(BankAF.test, type = "response")
+predicted.classes <- ifelse(probabilities > 0.5, "yes", "no")
+# Model accuracy
+mean(predicted.classes==BankAF.test$Subscription)
+
+predTable <- tibble(Predicted = as.factor(predicted.classes), Observed = BankAF.test$Subscription)
+
+confusionMatrix(predTable$Predicted, reference = predTable$Observed)
+```
 
 
 
