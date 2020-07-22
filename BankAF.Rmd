@@ -80,7 +80,7 @@ library(aod)
 ```
 
 ```{r}
-# Grab the file Bank Additional Full
+# Grab the file Bank Additional Full - Fill in your file
 BankAF <- read.csv(file = "F:/R For Real/Stats-2-Project-2/bank-additional-full.csv", sep = ";", header = TRUE)
 
 # Change the name of the response from y to Subscription
@@ -114,7 +114,7 @@ test.no<-BankAF.no[-index.no,]
 BankAF.train <- rbind(train.yes, train.no)
 BankAF.test <- rbind(test.yes, test.no)
 
-# Getting rid of duration  - it will predict nearly perfectly with this in mean prediction error = 0
+# Getting rid of duration  - it will predict nearly perfectly - with this in mean prediction error = 0
 # Also have to get rid of ID since it was being selected as good explanatory variable
 BankAF.train = BankAF.train %>% dplyr::select(-c(duration, ID))
 BankAF.test = BankAF.test %>% dplyr::select(-c(duration, ID))
@@ -141,6 +141,7 @@ na_count
 # Age ----
 # The Nos have a massive cut-off around 60 years old. Makes sense these at older ages you would be less interested in getting a TD, than having one already   # payout.
 # The median age for yes is actually younger than no
+# Maybe an Age Factor variable would be better?
 
 g1 = BankAF %>% ggplot(aes(x = age)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
   facet_wrap(facets = BankAF$Subscription) + xlab("Age") + coord_flip()
@@ -263,45 +264,85 @@ BankAF %>% group_by(previous, Subscription) %>% summarise(Count = n(), .groups =
 
 ```{r}
 library(MASS)
-mylogit.1 <- glm(Subscription ~ ., data = BankAF.train, family = binomial)
-
-```
-
-
-
-```{r}
-summary(mylogit.1)
-```
-
-# This is a bit disheartening essentially we can reach a maximum accuracy of the data set - eg if I classify everything as no I'm right nearly 91% of the time 
-```{r}
 library(caret)
+
+# Full Model
+mylogit.1 <- glm(Subscription ~ ., data = BankAF.train, family = binomial)
+summary(mylogit.1)
+
+
 # Make predictions
 probabilities <- mylogit.1 %>% predict(BankAF.test, type = "response")
 predicted.classes <- ifelse(probabilities > 0.3, "yes", "no")
 # Model accuracy
 mean(predicted.classes==BankAF.test$Subscription)
 
+# Create table for conjfusion Matrix
 predTable <- tibble(Predicted = as.factor(predicted.classes), Observed = BankAF.test$Subscription)
 
+#Confusion Matrix
 confusionMatrix(predTable$Predicted, reference = predTable$Observed)
 ```
 
-```{r}
-step.model <- mylogit.1 %>% stepAIC(trace = FALSE)
-coef(step.model)
-```
+
 
 ```{r}
+# Step Selected Model
+step.model <- mylogit.1 %>% stepAIC(trace = FALSE)
+summary(step.model)
+
 # Make predictions
 probabilities <- step.model %>% predict(BankAF.test, type = "response")
 predicted.classes <- ifelse(probabilities > 0.5, "yes", "no")
 # Model accuracy
 mean(predicted.classes==BankAF.test$Subscription)
 
+# Create table for conjfusion Matrix
 predTable <- tibble(Predicted = as.factor(predicted.classes), Observed = BankAF.test$Subscription)
 
+#Confusion Matrix
 confusionMatrix(predTable$Predicted, reference = predTable$Observed)
+```
+
+ 
+```{r}
+# looking at individual stuff
+modeltest1 <- glm(Subscription ~ age, data = BankAF.train, family = binomial)
+summary(modeltest1)
+
+# Make predictions
+probabilities <- modeltest1 %>% predict(BankAF.test, type = "response")
+predicted.classes <- ifelse(probabilities > 0.14, "yes", "no")
+# Model accuracy
+sprintf("Accuracy is %s", round(mean(predicted.classes==BankAF.test$Subscription),3))
+summary(probabilities)
+# Create table for conjfusion Matrix
+predTable <- tibble(Predicted = as.factor(predicted.classes), Observed = BankAF.test$Subscription)
+
+#Confusion Matrix
+confusionMatrix(predTable$Predicted, reference = predTable$Observed)
+```
+
+```{r}
+# looking at individual stuff
+modeltest2 <- glm(Subscription ~ age + default + job, data = BankAF.train, family = binomial)
+summary(modeltest2)
+
+# Make predictions
+probabilities <- modeltest2 %>% predict(BankAF.test, type = "response")
+predicted.classes <- ifelse(probabilities > 0.25, "yes", "no")
+# Model accuracy
+sprintf("Accuracy is %s", round(mean(predicted.classes==BankAF.test$Subscription),3))
+summary(probabilities)
+# Create table for conjfusion Matrix
+predTable <- tibble(Predicted = as.factor(predicted.classes), Observed = BankAF.test$Subscription)
+
+#Confusion Matrix
+confusionMatrix(predTable$Predicted, reference = predTable$Observed)
+```
+
+```{r}
+
 ```
 
 
