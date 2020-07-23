@@ -375,6 +375,7 @@ par(mfrow=c(1,1))
 # Create Data table of the PCs and the Response
 pc.scores = data.frame(pc.scores)
 pc.scores$Subscription = BankAF$Subscription
+pc.scores = pc.scores %>% mutate(SubBin = ifelse(pc.scores$Subscription =="no",0,1))
 ```
 
 
@@ -391,7 +392,21 @@ ggplot(data = pc.scores, aes(x = PC2, y =  PC3)) + geom_point(aes(color = Subscr
 ```
 
 ```{r}
-pcmodel1 <- glm(Subscription ~ PC1 + PC2, data = pc.scores)
+# Models with Only PCs
+pcmodel1 <- glm(SubBin ~ PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7, data = pc.scores)
+summary(pcmodel1)
+
+# Make predictions
+probabilities <-  pcmodel1 %>% predict(pc.scores, type = "response")
+predicted.classes <- ifelse(probabilities > 0.57, "yes", "no")
+# Model accuracy
+mean(predicted.classes==pc.scores$Subscription)
+summary(probabilities)
+# Create table for conjfusion Matrix
+predTable <- tibble(Predicted = as.factor(predicted.classes), Observed = pc.scores$Subscription)
+
+#Confusion Matrix
+confusionMatrix(predTable$Predicted, reference = predTable$Observed)
 ```
 
 
