@@ -372,11 +372,27 @@ par(mfrow=c(1,1))
 ```
 
 ```{r}
-
+# Create Data table of the PCs and the Response
+pc.scores = data.frame(pc.scores)
+pc.scores$Subscription = BankAF$Subscription
 ```
 
 
+```{r}
+ggplot(data = pc.scores, aes(x = PC1, y =  PC2)) + geom_point(aes(color = Subscription), size = 1)
+ggplot(data = pc.scores, aes(x = PC2, y =  PC3)) + geom_point(aes(color = Subscription), size = 1)
+ggplot(data = pc.scores, aes(x = PC1, y =  PC3)) + geom_point(aes(color = Subscription), size = 1)
 
+ggplot(data = pc.scores, aes(x = PC2, y =  PC4)) + geom_point(aes(color = Subscription), size = 1)
+ggplot(data = pc.scores, aes(x = PC3, y =  PC4)) + geom_point(aes(color = Subscription), size = 1)
+ggplot(data = pc.scores, aes(x = PC1, y =  PC4)) + geom_point(aes(color = Subscription), size = 1) # interesting case here
+
+ggplot(data = pc.scores, aes(x = PC2, y =  PC3)) + geom_point(aes(color = Subscription), size = 1)
+```
+
+```{r}
+pcmodel1 <- glm(Subscription ~ PC1 + PC2, data = pc.scores)
+```
 
 
 
