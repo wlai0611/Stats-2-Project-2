@@ -89,7 +89,7 @@ names(BankAF)[21] <- "Subscription"
 # Creating an ID column to spot check train test set data
 ID <- seq(1,41188,1)
 BankAF <- cbind(BankAF, ID)
-
+#BankAF <- BankAF %>% mutate(SubNum = ifelse(Subscription == 'yes',1,0))
 #Maybe a new categorical for pdays: New contact v Old contact - this might be captured in previous
 
 # Going to try to create 2 data sets, one for Subscription-yes one for Subscription-no, Sample each one proportionally then recombine into train and test sets
@@ -103,11 +103,11 @@ BankAF.no <- subset(BankAF, Subscription == "no")
 # Create Train and Test sets ----
 ## currently 90/10 Train/Test proportion of yes to no is 11.3% yes to 88.7% no this is slightly off the actual of 9.26% yes to 90.74% no
 set.seed(35)
-index.yes<-sample(1:dim(BankAF.yes)[1],floor(0.9*dim(BankAF.yes)),replace=F)
+index.yes<-sample(1:dim(BankAF.yes)[1],floor(0.98*dim(BankAF.yes)),replace=F)
 train.yes<-BankAF.yes[index.yes,]
 test.yes<-BankAF.yes[-index.yes,]
 
-index.no<-sample(1:dim(BankAF.no)[1],floor(0.9*dim(BankAF.no)),replace=F)
+index.no<-sample(1:dim(BankAF.no)[1],floor(0.5*dim(BankAF.no)),replace=F)
 train.no<-BankAF.no[index.no,]
 test.no<-BankAF.no[-index.no,]
 
@@ -267,16 +267,16 @@ library(MASS)
 library(caret)
 
 # Full Model
-mylogit.1 <- glm(Subscription ~ ., data = BankAF.train, family = binomial)
+mylogit.1 <- glm(Subscription ~ ., data = BankAF.train[,-7], family = binomial)
 summary(mylogit.1)
 
 
 # Make predictions
 probabilities <- mylogit.1 %>% predict(BankAF.test, type = "response")
-predicted.classes <- ifelse(probabilities > 0.3, "yes", "no")
+predicted.classes <- ifelse(probabilities < 0.1, "no", "yes")
 # Model accuracy
 mean(predicted.classes==BankAF.test$Subscription)
-
+summary(probabilities)
 # Create table for conjfusion Matrix
 predTable <- tibble(Predicted = as.factor(predicted.classes), Observed = BankAF.test$Subscription)
 
@@ -293,15 +293,21 @@ summary(step.model)
 
 # Make predictions
 probabilities <- step.model %>% predict(BankAF.test, type = "response")
-predicted.classes <- ifelse(probabilities > 0.5, "yes", "no")
+predicted.classes <- ifelse(probabilities > 0.14, "yes", "no")
 # Model accuracy
 mean(predicted.classes==BankAF.test$Subscription)
-
+summary(probabilities)
 # Create table for conjfusion Matrix
 predTable <- tibble(Predicted = as.factor(predicted.classes), Observed = BankAF.test$Subscription)
 
 #Confusion Matrix
 confusionMatrix(predTable$Predicted, reference = predTable$Observed)
+
+library(ROCR)
+results.lasso<-prediction(step.model, as.matrix(BankAF.test$Subscription),label.ordering=c("yes","no"))
+roc.lasso = performance(results.lasso, measure = "tpr", x.measure = "fpr")
+plot(roc.lasso,colorize = TRUE)
+abline(a=0, b= 1)
 ```
 
  
@@ -351,8 +357,6 @@ cov(BankAF.reduced)
 
 
 ```
-
-
 
 ```{r}
 pc.result <-prcomp(BankAF.reduced, scale. = TRUE)
