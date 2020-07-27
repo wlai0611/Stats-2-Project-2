@@ -128,6 +128,103 @@ str(BankAF)
 ```
 
 ```{r}
+# Boxplots 
+
+# Nothing
+BankAF %>% ggplot(aes(x = log(age), fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+  facet_wrap(facets = BankAF$Subscription) + xlab("Age") + coord_flip()
+
+# Nothing
+BankAF %>% ggplot(aes(x = log(campaign), fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+  facet_wrap(facets = BankAF$Subscription) + xlab("campaign") + coord_flip()
+
+# Nothing
+BankAF %>% ggplot(aes(x = log(pdays + 1), fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+  facet_wrap(facets = BankAF$Subscription) + xlab("pdays") + coord_flip()
+
+# Nothing
+BankAF %>% ggplot(aes(x = log(previous +1), fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+  facet_wrap(facets = BankAF$Subscription) + xlab("previous") + coord_flip()
+
+# Large difference here
+BankAF %>% ggplot(aes(x = emp.var.rate, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+  facet_wrap(facets = BankAF$Subscription) + xlab("emp.var.rate") + coord_flip()
+
+# Large Difference Here
+BankAF %>% ggplot(aes(x = cons.price.idx, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+  facet_wrap(facets = BankAF$Subscription) + xlab("cons price") + coord_flip()
+
+# Some difference
+BankAF %>% ggplot(aes(x = cons.conf.idx, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+  facet_wrap(facets = BankAF$Subscription) + xlab("cons conf") + coord_flip()
+
+# Massive difference in median
+BankAF %>% ggplot(aes(x = euribor3m, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+  facet_wrap(facets = BankAF$Subscription) + xlab("euribor") + coord_flip()
+
+# Large difference
+BankAF %>% ggplot(aes(x = nr.employed, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+  facet_wrap(facets = BankAF$Subscription) + xlab("nr.employed") + coord_flip()
+
+
+```
+
+```{r, warning = FALSE}
+# Categoricals
+#Student and Retired most likely to subscribe -  not very high in either around 25% of each
+BankAF %>% group_by(job, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+  ggplot(aes(x = job, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+
+# No marital status is super different single and unknown roughly 5-10% more likely than married/divorced
+BankAF %>% group_by(marital, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+  ggplot(aes(x = marital, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+
+# Illiterate nearly twice as likely to subscribe as others
+BankAF %>% group_by(education, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+  ggplot(aes(x = education, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+
+# Previous defaults have a 0% subscribe rate
+BankAF %>% group_by(default, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+  ggplot(aes(x = default, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+
+# No difference across housing
+BankAF %>% group_by(housing, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+  ggplot(aes(x = housing, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+
+# No difference across loan
+BankAF %>% group_by(loan, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+  ggplot(aes(x = loan, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+
+# Celluar contact has a much higher subscribe rate (14% vs 5%) nearly 3x!
+BankAF %>% group_by(contact, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+  ggplot(aes(x = contact, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+
+# Dec, March, Oct, Sept - Best months
+BankAF %>% group_by(month, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+  ggplot(aes(x = month, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+
+# Nothing
+BankAF %>% group_by(day_of_week, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+  ggplot(aes(x = day_of_week, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+
+# Previous success is a decent predictor of future success
+BankAF %>% group_by(poutcome, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+  ggplot(aes(x = poutcome, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+
+```
+
+
+```{r}
 # No Apparent NA Values, need to check for other NA identifiers
 gg_miss_var(BankAF)
 
@@ -221,6 +318,7 @@ g5 = ggdraw() +
                      summary(BankAF$campaign)[1], summary(BankAF$campaign)[2],
                      summary(BankAF$campaign)[3],round(summary(BankAF$campaign)[4],2),
                      summary(BankAF$campaign)[5],summary(BankAF$campaign)[6]))
+BankAF %>% group_by(Subscription) %>% dplyr::select()
 
 plot_grid(g1,NULL,NULL,g3,g2,NULL,NULL,g5, ncol = 4, nrow = 2, align = "h", rel_widths = c(2,0,0,3))
 ```
@@ -267,13 +365,13 @@ library(MASS)
 library(caret)
 
 # Full Model
-mylogit.1 <- glm(Subscription ~ ., data = BankAF.train[,-7], family = binomial)
+mylogit.1 <- glm(Subscription ~ ., data = BankAF.train, family = binomial)
 summary(mylogit.1)
 
 
 # Make predictions
 probabilities <- mylogit.1 %>% predict(BankAF.test, type = "response")
-predicted.classes <- ifelse(probabilities < 0.1, "no", "yes")
+predicted.classes <- ifelse(probabilities < 0.11, "no", "yes")
 # Model accuracy
 mean(predicted.classes==BankAF.test$Subscription)
 summary(probabilities)
@@ -293,18 +391,23 @@ summary(step.model)
 
 # Make predictions
 probabilities <- step.model %>% predict(BankAF.test, type = "response")
-predicted.classes <- ifelse(probabilities > 0.14, "yes", "no")
+predicted.classes <- as.factor(ifelse(probabilities > 0.091, "yes", "no"))
 # Model accuracy
 mean(predicted.classes==BankAF.test$Subscription)
 summary(probabilities)
 # Create table for conjfusion Matrix
 predTable <- tibble(Predicted = as.factor(predicted.classes), Observed = BankAF.test$Subscription)
 
+
 #Confusion Matrix
 confusionMatrix(predTable$Predicted, reference = predTable$Observed)
 
+```
+
+```{r}
+# Not working wont let me coerce to list?? 
 library(ROCR)
-results.lasso<-prediction(step.model, as.matrix(BankAF.test$Subscription),label.ordering=c("yes","no"))
+results.lasso<-prediction(predicted.classes, BankAF.test$Subscription, label.ordering=c("no","yes"))
 roc.lasso = performance(results.lasso, measure = "tpr", x.measure = "fpr")
 plot(roc.lasso,colorize = TRUE)
 abline(a=0, b= 1)
@@ -312,13 +415,14 @@ abline(a=0, b= 1)
 
  
 ```{r}
-# looking at individual stuff
-modeltest1 <- glm(Subscription ~ age, data = BankAF.train, family = binomial)
+# 
+modeltest1 <- glm(Subscription ~ emp.var.rate + cons.price.idx + cons.conf.idx + job + euribor3m + contact + month + poutcome, 
+                  data = BankAF.train, family = binomial)
 summary(modeltest1)
-
+vif(modeltest1)
 # Make predictions
 probabilities <- modeltest1 %>% predict(BankAF.test, type = "response")
-predicted.classes <- ifelse(probabilities > 0.14, "yes", "no")
+predicted.classes <- ifelse(probabilities > 0.1, "yes", "no")
 # Model accuracy
 sprintf("Accuracy is %s", round(mean(predicted.classes==BankAF.test$Subscription),3))
 summary(probabilities)
