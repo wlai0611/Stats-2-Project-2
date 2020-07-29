@@ -24,6 +24,7 @@ library(MASS)
 library(caret)
 library(e1071)
 library(glmnet)
+library(ROCR)
 ```
 
 
@@ -141,14 +142,18 @@ conf.step[4]/(conf.step[3]+ conf.step[4])
 ```
 
 ```{r}
-simple.log<-glm(Subscription ~ poutcome,family="binomial",data=BankAF.train)
+simple.log<-glm(Subscription ~ poutcome + emp.var.rate + contact + nr.employed + cons.price.idx + cons.conf.idx + emp.var.rate*poutcome + contact*day_of_week 
+                ,family="binomial",data=BankAF.train)
+
 fit.pred.origin<-predict(simple.log,newdata=BankAF.test,type="response")
+
 results.origin<-prediction(fit.pred.origin,BankAF.test$Subscription,label.ordering=c("no","yes"))
+
 roc.origin=performance(results.origin,measure = "tnr", x.measure = "fnr")
 ```
 
 ```{r}
-library(ROCR)
+
 # Get results from predictions
 results.lasso <- prediction(fit.pred.lasso, BankAF.test$Subscription,label.ordering=c("no","yes"))
 results.step <- prediction(fit.pred.step, BankAF.test$Subscription,label.ordering=c("no","yes")) 
@@ -157,12 +162,17 @@ results.step <- prediction(fit.pred.step, BankAF.test$Subscription,label.orderin
 roc.lasso = performance(results.lasso, measure = "tnr", x.measure = "fnr")
 roc.step = performance(results.step, measure = "tnr", x.measure = 'fnr')
 
-plot(roc.lasso, col = 1, lty = 1, main = "ROC")
-plot(roc.step, col = 2, lty = 1, add = TRUE)
-plot(roc.origin, col = 3, lty = 1, add = TRUE)
+plot(roc.lasso, col = "red", lty = 1, main = "ROC")
+plot(roc.step, col = "blue1", lty = 1, add = TRUE)
+plot(roc.origin, col = "darkgreen", lty = 1, add = TRUE)
+abline(a=0, b= 1)
+legend("bottomright",legend=c("Lasso","Stepwise","Trial"),col=c("red","blue","green"),lty=1,lwd=1)
 abline(a=0, b= 1)
 ```
 
+```{r}
+
+```
 
 
 
