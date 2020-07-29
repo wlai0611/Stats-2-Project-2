@@ -1,0 +1,173 @@
+---
+title: "LogReg Modeling"
+author: "Adam Canton"
+date: "7/29/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(magrittr)
+library(dplyr)
+library(tidyverse)
+library(olsrr)
+library(ggplot2)
+library(ggcorrplot)
+library(GGally)
+library(naniar)
+library(reshape2)
+library(ggthemes)
+library(cowplot)
+library(aod)
+library(ROCR)
+library(MASS)
+library(caret)
+library(e1071)
+library(glmnet)
+```
+
+
+```{r}
+# Grab the file Bank Additional Full - Fill in your file
+BankAF <- read.csv(file = "F:/R For Real/Stats-2-Project-2/bank-additional-full.csv", sep = ";", header = TRUE)
+
+# Change the name of the response from y to Subscription
+names(BankAF)[21] <- "Subscription"
+
+# Creating an ID column to spot check train test set data
+ID <- seq(1,41188,1)
+BankAF <- cbind(BankAF, ID)
+#BankAF <- BankAF %>% mutate(SubNum = ifelse(Subscription == 'yes',1,0))
+#Maybe a new categorical for pdays: New contact v Old contact - this might be captured in previous
+
+# Going to try to create 2 data sets, one for Subscription-yes one for Subscription-no, Sample each one proportionally then recombine into train and test sets
+BankAF.yes <- subset(BankAF, Subscription == "yes")
+BankAF.no <- subset(BankAF, Subscription == "no")
+
+```
+
+```{r}
+# Create Train and Test sets ----
+## currently train is close to 75/25,
+set.seed(35)
+index.yes<-sample(1:dim(BankAF.yes)[1],floor(0.98*dim(BankAF.yes)),replace=F)
+train.yes<-BankAF.yes[index.yes,]
+test.yes<-BankAF.yes[-index.yes,]
+
+index.no<-sample(1:dim(BankAF.no)[1],floor(0.5*dim(BankAF.no)),replace=F)
+train.no<-BankAF.no[index.no,]
+test.no<-BankAF.no[-index.no,]
+
+BankAF.train <- rbind(train.no, train.yes)
+BankAF.test <- rbind(test.no, test.yes)
+
+# Getting rid of duration  - it will predict nearly perfectly - with this in mean prediction error = 0
+# Also have to get rid of ID since it was being selected as good explanatory variable
+BankAF.train = BankAF.train %>% dplyr::select(-c(duration, ID))
+BankAF.test = BankAF.test %>% dplyr::select(-c(duration, ID))
+
+# remove intermediate data sets
+rm(test.no, test.yes, train.no, train.yes, BankAF.no, BankAF.yes)
+```
+
+```{r}
+full.log <- glm(Subscription ~ ., family = 'binomial', data = BankAF.train)
+step.log <- full.log %>% stepAIC(trace = FALSE)
+```
+
+
+```{r}
+Bank.Train.x <- model.matrix(Subscription ~ emp.var.rate + job, BankAF.train)
+Bank.Train.y <- BankAF.train[,20]
+
+cvfit <- cv.glmnet(Bank.Train.x, Bank.Train.y, family = "binomial", type.measure = "class", nlambda = 1000)
+
+plot(cvfit)
+coef(cvfit, s = "lambda.min")
+
+# Cv Missclassification
+print("Cv Error Rate:")
+cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
+
+
+# Optimal Penalty
+print("Penalty Value:")
+cvfit$lambda.min
+
+# Final Model
+finalmodel <- glmnet(Bank.Train.x, Bank.Train.y, family = "binomial", lambda = cvfit$lambda.min)
+```
+
+
+```{r}
+Bank.Test.x <- model.matrix(Subscription ~ emp.var.rate + job, BankAF.test)
+
+fit.pred.lasso <- predict(finalmodel, newx = Bank.Test.x, type = "response")
+
+BankAF.test$Subscription[1:15]
+fit.pred.lasso[1:15]
+
+fit.pred.step <- predict(step.log, newdata = BankAF.test, type= "response")
+```
+
+```{r}
+cutoff <- 0.11
+class.lasso <- factor(ifelse(fit.pred.lasso > cutoff, 'yes','no'),levels = c('no','yes'))
+class.step <- factor(ifelse(fit.pred.step > cutoff, 'yes','no'),levels = c('no','yes'))
+
+conf.lasso <- table(class.lasso, BankAF.test$Subscription)
+print("confusion matric for lasso")
+conf.lasso
+
+conf.step <- table(class.step, BankAF.test$Subscription)
+print("confusion matric for Step")
+conf.step
+
+```
+
+```{r}
+#Accuracy of LASSO and Stepwise
+#print("Overall accuracy for LASSO and Stepwise respectively")
+#sum(diag(conf.lasso))/sum(conf.lasso)
+#sum(diag(conf.step))/sum(conf.step)
+
+print("Alternative calculations of accuracy")
+#Rather than making the calculations from the table, we can compute them more quickly using the following code which just checks if the prediction matches the truth and then computes the proportion.
+mean(class.lasso==BankAF.test$Subscription)
+conf.lasso[4]/(conf.lasso[3]+ conf.lasso[4])
+mean(class.step==BankAF.test$Subscription)
+conf.step[4]/(conf.step[3]+ conf.step[4])
+```
+
+```{r}
+library(ROCR)
+# Get results from predictions
+results.lasso <- prediction(fit.pred.lasso, BankAF.test$Subscription,label.ordering=c("no","yes"))
+results.step <- prediction(fit.pred.step, BankAF.test$Subscription,label.ordering=c("no","yes")) 
+
+# look at performance metrics of above predictions
+roc.lasso = performance(results.lasso, measure = "tnr", x.measure = "fnr")
+roc.step = performance(results.step, measure = "tnr", x.measure = 'fnr')
+
+plot(roc.lasso,col = 1, lty = 1, main = "ROC")
+plot(roc.step, col = 2, lty = 1, add = TRUE)
+abline(a=0, b= 1)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
