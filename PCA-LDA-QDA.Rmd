@@ -1,0 +1,143 @@
+---
+title: "PCA-LDA/QDA"
+author: "Adam Canton"
+date: "7/30/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(magrittr)
+library(dplyr)
+library(tidyverse)
+library(olsrr)
+library(ggplot2)
+library(ggcorrplot)
+library(GGally)
+library(naniar)
+library(reshape2)
+library(ggthemes)
+library(cowplot)
+library(aod)
+library(ROCR)
+library(MASS)
+library(caret)
+library(e1071)
+library(glmnet)
+library(ROCR)
+library(forcats)
+```
+
+```{r}
+# Grab the file Bank Additional Full - Fill in your file
+BankAF <- read.csv(file = "F:/R For Real/Stats-2-Project-2/bank-additional-full.csv", sep = ";", header = TRUE)
+
+# Change the name of the response from y to Subscription
+names(BankAF)[21] <- "Subscription"
+
+# SubNum 1:yes 0:no
+BankAF <- BankAF %>% mutate(SubNum = ifelse(Subscription == "yes",1,0))
+
+# Creates a numeric data set for PCA
+BankAF.Numeric<- BankAF %>% dplyr::select(age, campaign,pdays, previous, emp.var.rate, cons.price.idx, cons.conf.idx, euribor3m, nr.employed, SubNum)
+```
+
+```{r}
+# Create Train and test Samples
+BankAF.Numeric.yes <- subset(BankAF.Numeric, SubNum == 1)
+BankAF.Numeric.no <- subset(BankAF.Numeric, SubNum == 0)
+
+set.seed(35)
+index.yes<-sample(1:dim(BankAF.Numeric.yes)[1],floor(0.98*dim(BankAF.Numeric.yes)),replace=F)
+train.yes<-BankAF.Numeric.yes[index.yes,]
+test.yes<-BankAF.Numeric.yes[-index.yes,]
+
+index.no<-sample(1:dim(BankAF.Numeric.no)[1],floor(0.3*dim(BankAF.Numeric.no)),replace=F)
+train.no<-BankAF.Numeric.no[index.no,]
+test.no<-BankAF.Numeric.no[-index.no,]
+
+BankAF.train.x <- rbind(train.no, train.yes)
+BankAF.train.y <- BankAF.train.x[,10]
+BankAF.train.y <- as.factor(as.character(BankAF.train.y))
+BankAF.train.x <- BankAF.train.x[,1:9]
+
+
+BankAF.test.x <- rbind(test.no, test.yes)
+BankAF.test.y <- BankAF.test.x[,10]
+BankAF.test.y <- as.factor(as.character(BankAF.test.y))
+BankAF.test.x <- BankAF.test.x[,1:9]
+
+
+
+# remove intermediate data sets
+rm(test.no, test.yes, train.no, train.yes, BankAF.Numeric.no, BankAF.Numeric.yes)
+```
+
+# PCs
+```{r}
+pc.result <- prcomp(BankAF.train.x, scale. = TRUE)
+pc.scores <- pc.result$x
+pc.scores <- data.frame(pc.scores)
+pc.scores$SubNum <- BankAF.train.y
+
+pc.result$rotation
+
+#Scree plot - 2 or 5 or 7
+pc.eigen<-(pc.result$sdev)^2
+pc.prop<-pc.eigen/sum(pc.eigen)
+pc.cumprop<-cumsum(pc.prop)
+plot(1:9,pc.prop,type="l",main="Scree Plot",ylim=c(0,1),xlab="PC #",ylab="Proportion of Variation")
+lines(1:9,pc.cumprop,lty=3)
+```
+
+```{r}
+#Use ggplot2 to plot the first few pc's
+ggplot(data = pc.scores, aes(x = PC1, y = PC2)) +
+  geom_point(aes(col=SubNum), size=1)+
+  geom_hline(yintercept = 0, colour = "gray65") +
+  geom_vline(xintercept = 0, colour = "gray65") +
+  ggtitle("PCA plot of Gene Expression Data")
+
+ggplot(data = pc.scores, aes(x = PC1, y = PC3)) +
+    geom_point(aes(col=SubNum), size=1)+
+  geom_hline(yintercept = 0, colour = "gray65") +
+    geom_vline(xintercept = 0, colour = "gray65") +
+    ggtitle("PCA plot of Gene Expression Data")
+
+  
+ggplot(data = pc.scores, aes(x = PC2, y = PC3)) +
+    geom_point(aes(col=SubNum), size=1)+
+  geom_hline(yintercept = 0, colour = "gray65") +
+    geom_vline(xintercept = 0, colour = "gray65") +
+    ggtitle("PCA plot of Gene Expression Data") +
+  geom_jitter(aes(col=SubNum), size=1)
+```
+
+```{r}
+cbind(BankAF.train.x, BankAF.train.y)
+```
+
+
+```{r}
+# LDA training Model
+fit.lda <- lda(BankAF.train.y ~ ., data = BankAF.train.x)
+
+pred.lda <- predict(fit.lda, newdata = BankAF.train.x)
+
+preds <- pred.lda$posterior
+preds <- as.data.frame(preds)
+
+pred <- prediction(preds[,2],BankAF.train.y)
+roc.perf = performance(pred, measure = "tpr", x.measure = "fpr")
+auc.train <- performance(pred, measure = "auc")
+auc.train <- auc.train@y.values
+plot(roc.perf)
+abline(a=0, b= 1)
+text(x = .40, y = .6,paste("AUC = ", round(auc.train[[1]],3), sep = ""))
+
+```
+
+```{r}
+
+```
+
