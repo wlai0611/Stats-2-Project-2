@@ -109,15 +109,17 @@ Bank.Test.x <- model.matrix(Subscription ~ pdays + emp.var.rate + job + previous
 
 fit.pred.lasso <- predict(finalmodel, newx = Bank.Test.x, type = "response")
 
-BankAF.test$Subscription[1:15]
-fit.pred.lasso[1:15]
+p = data.frame(Subs = BankAF.test$Subscription,Preds = fit.pred.lasso)
+names(p)[2] <- 'Preds'
+p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxplot()
+#write.csv(data.frame(BankAF.test$Subscription,fit.pred.lasso), file = "F:/R For Real/Stats-2-Project-2/LassoPred.csv")
 
 fit.pred.step <- predict(step.log, newdata = BankAF.test, type= "response")
 ```
 
 ```{r}
-cutoff.lasso <- 0.4
-cutoff.step <- 0.4
+cutoff.lasso <- 0.23
+cutoff.step <- 0.24
 
 class.lasso <- factor(ifelse(fit.pred.lasso > cutoff.lasso, 'yes','no'),levels = c('no','yes'))
 class.step <- factor(ifelse(fit.pred.step > cutoff.step, 'yes','no'),levels = c('no','yes'))
@@ -130,12 +132,19 @@ confusionMatrix(class.step, BankAF.test$Subscription)
 ```
 
 ```{r}
+cutoff.origin <- 0.24
+
 simple.log<-glm(Subscription ~ poutcome + emp.var.rate + contact + nr.employed + cons.price.idx + cons.conf.idx + emp.var.rate*poutcome + contact*day_of_week 
                 ,family="binomial",data=BankAF.train)
 
 fit.pred.origin<-predict(simple.log,newdata=BankAF.test,type="response")
 
 results.origin<-prediction(fit.pred.origin,BankAF.test$Subscription,label.ordering=c("no","yes"))
+
+class.origin <- factor(ifelse(fit.pred.origin > cutoff.origin, 'yes','no'),levels = c('no','yes'))
+
+print("Confusion Step")
+confusionMatrix(class.origin, BankAF.test$Subscription)
 
 roc.origin=performance(results.origin,measure = "tnr", x.measure = "fnr")
 ```
@@ -150,11 +159,11 @@ results.step <- prediction(fit.pred.step, BankAF.test$Subscription,label.orderin
 roc.lasso = performance(results.lasso, measure = "tnr", x.measure = "fnr")
 roc.step = performance(results.step, measure = "tnr", x.measure = 'fnr')
 
-plot(roc.lasso, col = "red", lty = 1, main = "ROC")
-plot(roc.step, col = "blue1", lty = 1, add = TRUE)
-plot(roc.origin, col = "darkgreen", lty = 1, add = TRUE)
+plot(roc.lasso, col = "red", lty = 1, main = "ROC", colorize = TRUE)
+plot(roc.step, col = "blue1", lty = 1, add = TRUE, colorize = TRUE)
+plot(roc.origin, col = "darkgreen", lty = 1, add = TRUE, colorize = TRUE)
 abline(a=0, b= 1)
-legend("bottomright",legend=c("Lasso","Stepwise","Trial"),col=c("red","blue","green"),lty=1,lwd=1)
+#legend("bottomright",legend=c("Lasso","Stepwise","Origin"),col=c("red","blue","green"),lty=1,lwd=1)
 abline(a=0, b= 1)
 ```
 
