@@ -55,7 +55,7 @@ index.yes<-sample(1:dim(BankAF.yes)[1],floor(0.98*dim(BankAF.yes)),replace=F)
 train.yes<-BankAF.yes[index.yes,]
 test.yes<-BankAF.yes[-index.yes,]
 
-index.no<-sample(1:dim(BankAF.no)[1],floor(0.5*dim(BankAF.no)),replace=F)
+index.no<-sample(1:dim(BankAF.no)[1],floor(0.3*dim(BankAF.no)),replace=F)
 train.no<-BankAF.no[index.no,]
 test.no<-BankAF.no[-index.no,]
 
@@ -78,7 +78,9 @@ step.log <- full.log %>% stepAIC(trace = FALSE)
 
 
 ```{r}
-Bank.Train.x <- model.matrix(Subscription ~ emp.var.rate + job, BankAF.train)
+# Build Lasso Model on train set
+Bank.Train.x <- model.matrix(Subscription ~ pdays + emp.var.rate + job + previous + cons.price.idx + cons.conf.idx + euribor3m + nr.employed
+                             + education + default + contact + poutcome + month, BankAF.train)
 Bank.Train.y <- BankAF.train[,20]
 
 cvfit <- cv.glmnet(Bank.Train.x, Bank.Train.y, family = "binomial", type.measure = "class", nlambda = 1000)
@@ -101,7 +103,9 @@ finalmodel <- glmnet(Bank.Train.x, Bank.Train.y, family = "binomial", lambda = c
 
 
 ```{r}
-Bank.Test.x <- model.matrix(Subscription ~ emp.var.rate + job, BankAF.test)
+# Get predictions from Lasso Model on Test set
+Bank.Test.x <- model.matrix(Subscription ~ pdays + emp.var.rate + job + previous + cons.price.idx + cons.conf.idx + euribor3m + nr.employed
+                             + education + default + contact + poutcome + month, BankAF.test)
 
 fit.pred.lasso <- predict(finalmodel, newx = Bank.Test.x, type = "response")
 
@@ -112,33 +116,17 @@ fit.pred.step <- predict(step.log, newdata = BankAF.test, type= "response")
 ```
 
 ```{r}
-cutoff <- 0.11
-class.lasso <- factor(ifelse(fit.pred.lasso > cutoff, 'yes','no'),levels = c('no','yes'))
-class.step <- factor(ifelse(fit.pred.step > cutoff, 'yes','no'),levels = c('no','yes'))
+cutoff.lasso <- 0.4
+cutoff.step <- 0.4
 
-conf.lasso <- table(class.lasso, BankAF.test$Subscription)
-print("confusion matric for lasso")
-conf.lasso
+class.lasso <- factor(ifelse(fit.pred.lasso > cutoff.lasso, 'yes','no'),levels = c('no','yes'))
+class.step <- factor(ifelse(fit.pred.step > cutoff.step, 'yes','no'),levels = c('no','yes'))
 
-conf.step <- table(class.step, BankAF.test$Subscription)
-print("confusion matric for Step")
-conf.step
-
+print("Confusion Lasso")
+confusionMatrix(class.lasso, BankAF.test$Subscription)
+cat("**********************************************\n**********************************************\n\n")
+print("Confusion Step")
 confusionMatrix(class.step, BankAF.test$Subscription)
-```
-
-```{r}
-#Accuracy of LASSO and Stepwise
-#print("Overall accuracy for LASSO and Stepwise respectively")
-#sum(diag(conf.lasso))/sum(conf.lasso)
-#sum(diag(conf.step))/sum(conf.step)
-
-print("Alternative calculations of accuracy")
-#Rather than making the calculations from the table, we can compute them more quickly using the following code which just checks if the prediction matches the truth and then computes the proportion.
-mean(class.lasso==BankAF.test$Subscription)
-conf.lasso[4]/(conf.lasso[3]+ conf.lasso[4])
-mean(class.step==BankAF.test$Subscription)
-conf.step[4]/(conf.step[3]+ conf.step[4])
 ```
 
 ```{r}
