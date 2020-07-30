@@ -126,6 +126,7 @@ rm(test.no, test.yes, train.no, train.yes, BankAF.no, BankAF.yes)
 
 ```{r}
 str(BankAF)
+summary(BankAF$previous)
 ```
 
 ```{r}
