@@ -25,6 +25,7 @@ library(caret)
 library(e1071)
 library(glmnet)
 library(ROCR)
+library(forcats)
 ```
 
 
@@ -41,21 +42,39 @@ BankAF <- cbind(BankAF, ID)
 #BankAF <- BankAF %>% mutate(SubNum = ifelse(Subscription == 'yes',1,0))
 #Maybe a new categorical for pdays: New contact v Old contact - this might be captured in previous
 
+```
+
+```{r}
+# Adding some features
+## changing some continous into categoricals
+### Pdays - categorical contacted before - 1: yes 0: no
+BankAF <- BankAF %>% mutate(PreviousContact = ifelse(pdays == 999, 0,1))
+BankAF$PreviousContact <- as.factor(BankAF$PreviousContact)
+
+### Workforce -  1: yes, 0: no (retired, student, unemployed)
+BankAF$Workforce <- fct_collapse(BankAF$job,
+                                 "1" = c("admin.","blue-collar","entrepreneur","housemaid","management","self-employed","services","technician","unknown"),
+                                 "0" = c("student", "retired", "unemployed"))
+
+### Have they had a previous success with this client
+BankAF$PreviousSuccess <- fct_collapse(BankAF$poutcome, "1" = c("success"), "0" = c("nonexistent", "failure"))
+```
+
+# Logit Models
+```{r}
+# Create Train and Test sets ----
+## currently train is close to 75/25,
+
 # Going to try to create 2 data sets, one for Subscription-yes one for Subscription-no, Sample each one proportionally then recombine into train and test sets
 BankAF.yes <- subset(BankAF, Subscription == "yes")
 BankAF.no <- subset(BankAF, Subscription == "no")
 
-```
-
-```{r}
-# Create Train and Test sets ----
-## currently train is close to 75/25,
 set.seed(35)
 index.yes<-sample(1:dim(BankAF.yes)[1],floor(0.98*dim(BankAF.yes)),replace=F)
 train.yes<-BankAF.yes[index.yes,]
 test.yes<-BankAF.yes[-index.yes,]
 
-index.no<-sample(1:dim(BankAF.no)[1],floor(0.3*dim(BankAF.no)),replace=F)
+index.no<-sample(1:dim(BankAF.no)[1],floor(0.1*dim(BankAF.no)),replace=F)
 train.no<-BankAF.no[index.no,]
 test.no<-BankAF.no[-index.no,]
 
@@ -72,15 +91,17 @@ rm(test.no, test.yes, train.no, train.yes, BankAF.no, BankAF.yes)
 ```
 
 ```{r}
+# Creating Step Log model from original variables - full model
 full.log <- glm(Subscription ~ ., family = 'binomial', data = BankAF.train)
 step.log <- full.log %>% stepAIC(trace = FALSE)
+
 ```
 
 
 ```{r}
 # Build Lasso Model on train set
 Bank.Train.x <- model.matrix(Subscription ~ pdays + emp.var.rate + job + previous + cons.price.idx + cons.conf.idx + euribor3m + nr.employed
-                             + education + default + contact + poutcome + month, BankAF.train)
+                             + education + default + contact + poutcome + month + PreviousContact + PreviousSuccess + Workforce, BankAF.train)
 Bank.Train.y <- BankAF.train[,20]
 
 cvfit <- cv.glmnet(Bank.Train.x, Bank.Train.y, family = "binomial", type.measure = "class", nlambda = 1000)
@@ -105,21 +126,21 @@ finalmodel <- glmnet(Bank.Train.x, Bank.Train.y, family = "binomial", lambda = c
 ```{r}
 # Get predictions from Lasso Model on Test set
 Bank.Test.x <- model.matrix(Subscription ~ pdays + emp.var.rate + job + previous + cons.price.idx + cons.conf.idx + euribor3m + nr.employed
-                             + education + default + contact + poutcome + month, BankAF.test)
+                             + education + default + contact + poutcome + month + PreviousContact + PreviousSuccess + Workforce, BankAF.test)
 
 fit.pred.lasso <- predict(finalmodel, newx = Bank.Test.x, type = "response")
 
 p = data.frame(Subs = BankAF.test$Subscription,Preds = fit.pred.lasso)
 names(p)[2] <- 'Preds'
-p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxplot()
+p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_histogram(binwidth = 0.01) + facet_wrap(~Subs)
 #write.csv(data.frame(BankAF.test$Subscription,fit.pred.lasso), file = "F:/R For Real/Stats-2-Project-2/LassoPred.csv")
 
 fit.pred.step <- predict(step.log, newdata = BankAF.test, type= "response")
 ```
 
 ```{r}
-cutoff.lasso <- 0.23
-cutoff.step <- 0.24
+cutoff.lasso <- 0.4
+cutoff.step <- 0.4
 
 class.lasso <- factor(ifelse(fit.pred.lasso > cutoff.lasso, 'yes','no'),levels = c('no','yes'))
 class.step <- factor(ifelse(fit.pred.step > cutoff.step, 'yes','no'),levels = c('no','yes'))
@@ -132,10 +153,10 @@ confusionMatrix(class.step, BankAF.test$Subscription)
 ```
 
 ```{r}
-cutoff.origin <- 0.24
+cutoff.origin <- 0.4
 
 simple.log<-glm(Subscription ~ poutcome + emp.var.rate + contact + nr.employed + cons.price.idx + cons.conf.idx + emp.var.rate*poutcome + contact*day_of_week 
-                ,family="binomial",data=BankAF.train)
+                + PreviousContact + PreviousSuccess + Workforce,family="binomial",data=BankAF.train)
 
 fit.pred.origin<-predict(simple.log,newdata=BankAF.test,type="response")
 
@@ -143,11 +164,32 @@ results.origin<-prediction(fit.pred.origin,BankAF.test$Subscription,label.orderi
 
 class.origin <- factor(ifelse(fit.pred.origin > cutoff.origin, 'yes','no'),levels = c('no','yes'))
 
-print("Confusion Step")
+print("Confusion Custom")
 confusionMatrix(class.origin, BankAF.test$Subscription)
 
 roc.origin=performance(results.origin,measure = "tnr", x.measure = "fnr")
 ```
+
+```{r}
+# Creating step log model with PCs
+## Note this will only run if you have created the Princpal Components from PCA-LDA-QDA.Rmd
+pc.log.full <- glm(SubNum ~ ., family = 'binomial', data = pc.scores)
+pc.step.log <- pc.log.full %>% stepAIC(trace = FALSE)
+
+cutoff.pc = 0.422
+
+fit.pc.log <- predict(pc.step.log, newdata = pc.scores.test, type = "response")
+
+results.pc.log <- prediction(fit.pc.log, BankAF.test.y, label.ordering = c("0", "1"))
+
+class.pc.log <- factor(ifelse(fit.pc.log > cutoff.pc, "1", "0"), levels = c("0", "1"))
+
+print("Confusion Matrix PC")
+confusionMatrix(class.pc.log, BankAF.test.y)
+
+roc.pc = performance(results.pc.log,measure = "tnr", x.measure = "fnr")
+```
+
 
 ```{r}
 
@@ -160,16 +202,14 @@ roc.lasso = performance(results.lasso, measure = "tnr", x.measure = "fnr")
 roc.step = performance(results.step, measure = "tnr", x.measure = 'fnr')
 
 plot(roc.lasso, col = "red", lty = 1, main = "ROC", colorize = TRUE)
-plot(roc.step, col = "blue1", lty = 1, add = TRUE, colorize = TRUE)
-plot(roc.origin, col = "darkgreen", lty = 1, add = TRUE, colorize = TRUE)
+plot(roc.step, col = "blue1", lty = 2, add = TRUE, colorize = TRUE)
+plot(roc.origin, col = "darkgreen", lty = 3, add = TRUE, colorize = TRUE)
+plot(roc.pc, col = "darkorchid4", lty = 4, add = TRUE, colorize = TRUE)
 abline(a=0, b= 1)
 #legend("bottomright",legend=c("Lasso","Stepwise","Origin"),col=c("red","blue","green"),lty=1,lwd=1)
 abline(a=0, b= 1)
 ```
 
-```{r}
-
-```
 
 
 

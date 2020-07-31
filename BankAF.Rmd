@@ -46,6 +46,7 @@ Input variables:
 13 - pdays: number of days that passed by after the client was last contacted from a previous campaign (numeric; 999 means client was not previously
      contacted)
      
+     
 14 - previous: number of contacts performed before this campaign and for this client (numeric)
 
 15 - poutcome: outcome of the previous marketing campaign (categorical: 'failure','nonexistent','success')
@@ -161,8 +162,7 @@ BankAF %>% ggplot(aes(x = cons.conf.idx, fill = Subscription)) + geom_boxplot() 
   facet_wrap(facets = BankAF$Subscription) + xlab("cons conf") + coord_flip()
 
 # Massive difference in median
-BankAF %>% ggplot(aes(x = euribor3m, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
-  facet_wrap(facets = BankAF$Subscription) + xlab("euribor") + coord_flip()
+BankAF %>% ggplot(aes(x = euribor3m, fill = Subscription)) + geom_histogram(binwidth = 1) + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + facet_wrap(facets = BankAF$Subscription) + xlab("euribor") + coord_flip()
 
 # Large difference
 BankAF %>% ggplot(aes(x = nr.employed, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 

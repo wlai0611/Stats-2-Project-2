@@ -52,7 +52,7 @@ index.yes<-sample(1:dim(BankAF.Numeric.yes)[1],floor(0.98*dim(BankAF.Numeric.yes
 train.yes<-BankAF.Numeric.yes[index.yes,]
 test.yes<-BankAF.Numeric.yes[-index.yes,]
 
-index.no<-sample(1:dim(BankAF.Numeric.no)[1],floor(0.3*dim(BankAF.Numeric.no)),replace=F)
+index.no<-sample(1:dim(BankAF.Numeric.no)[1],floor(0.1*dim(BankAF.Numeric.no)),replace=F)
 train.no<-BankAF.Numeric.no[index.no,]
 test.no<-BankAF.Numeric.no[-index.no,]
 
@@ -75,6 +75,7 @@ rm(test.no, test.yes, train.no, train.yes, BankAF.Numeric.no, BankAF.Numeric.yes
 
 # PCs
 ```{r}
+# Creating PC Train Set
 pc.result <- prcomp(BankAF.train.x, scale. = TRUE)
 pc.scores <- pc.result$x
 pc.scores <- data.frame(pc.scores)
@@ -82,13 +83,27 @@ pc.scores$SubNum <- BankAF.train.y
 
 pc.result$rotation
 
+
+# Create PC test Set
+pc.result.test <- prcomp(BankAF.test.x, scale = TRUE)
+pc.scores.test <- pc.result.test$x
+pc.scores.test <- data.frame(pc.scores.test)
+
 #Scree plot - 2 or 5 or 7
 pc.eigen<-(pc.result$sdev)^2
 pc.prop<-pc.eigen/sum(pc.eigen)
 pc.cumprop<-cumsum(pc.prop)
 plot(1:9,pc.prop,type="l",main="Scree Plot",ylim=c(0,1),xlab="PC #",ylab="Proportion of Variation")
 lines(1:9,pc.cumprop,lty=3)
+
+
+
 ```
+
+```{r}
+
+```
+
 
 ```{r}
 #Use ggplot2 to plot the first few pc's
@@ -112,11 +127,6 @@ ggplot(data = pc.scores, aes(x = PC2, y = PC3)) +
     ggtitle("PCA plot of Gene Expression Data") +
   geom_jitter(aes(col=SubNum), size=1)
 ```
-
-```{r}
-cbind(BankAF.train.x, BankAF.train.y)
-```
-
 
 ```{r}
 # LDA training Model
