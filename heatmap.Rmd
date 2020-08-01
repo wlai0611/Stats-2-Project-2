@@ -1,0 +1,51 @@
+---
+title: "heatmap"
+author: "Walter"
+date: "August 1, 2020"
+output: html_document
+---
+
+```{r}
+#insert number of yes/no sample from 
+numObs=40
+BankAF=read.csv('bank-additional-full.csv',sep=';',header=TRUE)
+
+names(BankAF)[21] <- "Subscription"
+
+# Creating an ID column to spot check train test set data
+ID <- seq(1,41188,1)
+BankAF <- cbind(BankAF, ID)
+
+BankAF.yes <- subset(BankAF, Subscription == "yes")
+BankAF.no <- subset(BankAF, Subscription == "no")
+set.seed(35)
+index.yes<-sample(1:dim(BankAF.yes)[1],numObs,replace=F)
+train.yes<-BankAF.yes[index.yes,]
+#test.yes<-BankAF.yes[-index.yes,]
+
+index.no<-sample(1:dim(BankAF.no)[1],numObs,replace=F)
+train.no<-BankAF.no[index.no,]
+#test.no<-BankAF.no[-index.no,]
+
+BankAF.train <- rbind(train.yes, train.no)
+```
+
+```{r}
+dat.train.y=BankAF.train$Subscription
+dat.train.y <- as.factor(as.character(dat.train.y))
+```
+Get only the numerical column
+```{r}
+library(purrr)
+numerics=BankAF.train %>% keep(is.numeric)
+numerics=numerics[,c(names(numerics) != "ID")]
+```
+
+```{r}
+library(pheatmap)
+x = t(numerics)
+colnames(x)<-dat.train.y
+pheatmap(x,annotation_col=data.frame(Subscription=dat.train.y),annotation_colors=list(Subscription=c("2"="white","1"="green")),scale="row",legend=T,color=colorRampPalette(c("blue","white", "red"), space = "rgb")(100))
+
+```
+
