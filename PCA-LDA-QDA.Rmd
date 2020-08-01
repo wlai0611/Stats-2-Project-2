@@ -101,11 +101,6 @@ lines(1:9,pc.cumprop,lty=3)
 ```
 
 ```{r}
-
-```
-
-
-```{r}
 #Use ggplot2 to plot the first few pc's
 ggplot(data = pc.scores, aes(x = PC1, y = PC2)) +
   geom_point(aes(col=SubNum), size=1)+
