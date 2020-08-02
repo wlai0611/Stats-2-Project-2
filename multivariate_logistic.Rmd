@@ -1,0 +1,95 @@
+---
+title: "Multivariate Logistic"
+author: "Walter"
+date: "August 1, 2020"
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(magrittr)
+library(dplyr)
+library(tidyverse)
+library(olsrr)
+library(ggplot2)
+library(ggcorrplot)
+library(GGally)
+library(naniar)
+library(reshape2)
+library(ggthemes)
+library(cowplot)
+library(aod)
+library(ROCR)
+library(MASS)
+library(caret)
+library(e1071)
+library(glmnet)
+library(ROCR)
+library(forcats)
+library(epitools)
+```
+
+
+```{r}
+# Grab the file Bank Additional Full - Fill in your file
+BankAF <- read.csv("bank-additional-full.csv", sep = ";", header = TRUE)
+
+# Change the name of the response from y to Subscription
+names(BankAF)[21] <- "Subscription"
+
+# Creating an ID column to spot check train test set data
+ID <- seq(1,41188,1)
+BankAF <- cbind(BankAF, ID)
+#BankAF <- BankAF %>% mutate(SubNum = ifelse(Subscription == 'yes',1,0))
+#Maybe a new categorical for pdays: New contact v Old contact - this might be captured in previous
+
+```
+
+
+```{r}
+# Adding some features
+## changing some continous into categoricals
+### Pdays - categorical contacted before - 1: yes 0: no
+BankAF <- BankAF %>% mutate(PreviousContact = ifelse(pdays == 999, 0,1))
+BankAF$PreviousContact <- as.factor(BankAF$PreviousContact)
+
+### Workforce -  1: yes, 0: no (retired, student, unemployed)
+BankAF$Workforce <- fct_collapse(BankAF$job,
+                                 "1" = c("admin.","blue-collar","entrepreneur","housemaid","management","self-employed","services","technician","unknown"),
+                                 "0" = c("student", "retired", "unemployed"))
+
+### Have they had a previous success with this client
+BankAF$PreviousSuccess <- fct_collapse(BankAF$poutcome, "1" = c("success"), "0" = c("nonexistent", "failure"))
+```
+
+Vanilla Train Test
+```{r}
+index_train<-sample(1:dim(BankAF)[1],floor(0.75*dim(BankAF)),replace=F)
+
+bank_train<-BankAF[index_train,]
+bank_test<-BankAF[-index_train,]
+```
+
+```{r}
+multivar_log=glm(Subscription~pdays+nr.employed+emp.var.rate+euribor3m,
+                 family='binomial',
+                 data=bank_train)
+
+probabilities<-predict(multivar_log,newdata=bank_test[,names(bank_test)!='Subscription']
+                       ,type="response")
+
+BankAF.yes <- subset(BankAF, Subscription == "yes")
+BankAF.no <- subset(BankAF, Subscription == "no")
+cutoff=nrow(BankAF.yes)/nrow(BankAF)
+classifications<-factor(ifelse(probabilities>cutoff,"yes","no"),levels=c("no","yes"))
+confusion=table(classifications,bank_test[,'Subscription'])
+mean(classifications==bank_test[,'Subscription'])
+true_positive=confusion[2,2]/sum(confusion[,2])
+true_negative=confusion[1,1]/sum(confusion[,1])
+print("True positive rate is %s")
+true_positive
+print("True negative rate is %s")
+true_negative
+```
