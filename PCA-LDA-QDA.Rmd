@@ -96,8 +96,6 @@ pc.cumprop<-cumsum(pc.prop)
 plot(1:9,pc.prop,type="l",main="Scree Plot",ylim=c(0,1),xlab="PC #",ylab="Proportion of Variation")
 lines(1:9,pc.cumprop,lty=3)
 
-
-
 ```
 
 ```{r}
@@ -106,20 +104,34 @@ ggplot(data = pc.scores, aes(x = PC1, y = PC2)) +
   geom_point(aes(col=SubNum), size=1)+
   geom_hline(yintercept = 0, colour = "gray65") +
   geom_vline(xintercept = 0, colour = "gray65") +
-  ggtitle("PCA plot of Gene Expression Data")
+  ggtitle("PCA 1 v 2 plot")
 
 ggplot(data = pc.scores, aes(x = PC1, y = PC3)) +
     geom_point(aes(col=SubNum), size=1)+
   geom_hline(yintercept = 0, colour = "gray65") +
     geom_vline(xintercept = 0, colour = "gray65") +
-    ggtitle("PCA plot of Gene Expression Data")
+    ggtitle("PCA 1 v 3 plot")
 
   
 ggplot(data = pc.scores, aes(x = PC2, y = PC3)) +
     geom_point(aes(col=SubNum), size=1)+
   geom_hline(yintercept = 0, colour = "gray65") +
     geom_vline(xintercept = 0, colour = "gray65") +
-    ggtitle("PCA plot of Gene Expression Data") +
+    ggtitle("PCA 2 v 3 plot") +
+  geom_jitter(aes(col=SubNum), size=1)
+
+ggplot(data = pc.scores, aes(x = PC1, y = PC4)) +
+    geom_point(aes(col=SubNum), size=1)+
+  geom_hline(yintercept = 0, colour = "gray65") +
+    geom_vline(xintercept = 0, colour = "gray65") +
+    ggtitle("PCA 1 v 4 plot") +
+  geom_jitter(aes(col=SubNum), size=1)
+
+ggplot(data = pc.scores, aes(x = PC1, y = PC6)) +
+    geom_point(aes(col=SubNum), size=1)+
+  geom_hline(yintercept = 0, colour = "gray65") +
+    geom_vline(xintercept = 0, colour = "gray65") +
+    ggtitle("PCA 2 v 4 plot") +
   geom_jitter(aes(col=SubNum), size=1)
 ```
 

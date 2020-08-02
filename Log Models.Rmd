@@ -36,6 +36,9 @@ BankAF <- read.csv(file = "F:/R For Real/Stats-2-Project-2/bank-additional-full.
 # Change the name of the response from y to Subscription
 names(BankAF)[21] <- "Subscription"
 
+# SubNum 1:yes 0:no
+BankAF <- BankAF %>% mutate(SubNum = ifelse(Subscription == "yes",1,0))
+
 # Creating an ID column to spot check train test set data
 ID <- seq(1,41188,1)
 BankAF <- cbind(BankAF, ID)
@@ -63,18 +66,21 @@ BankAF$PreviousSuccess <- fct_collapse(BankAF$poutcome, "1" = c("success"), "0" 
 # Logit Models
 ```{r}
 # Create Train and Test sets ----
-## currently train is close to 75/25,
+
+# How Many yes and no?
+DimYes <- 3000 
+DimNo <- 3000
 
 # Going to try to create 2 data sets, one for Subscription-yes one for Subscription-no, Sample each one proportionally then recombine into train and test sets
 BankAF.yes <- subset(BankAF, Subscription == "yes")
 BankAF.no <- subset(BankAF, Subscription == "no")
 
 set.seed(35)
-index.yes<-sample(1:dim(BankAF.yes)[1],floor(0.98*dim(BankAF.yes)),replace=F)
+index.yes<-sample(1:dim(BankAF.yes)[1],DimYes,replace=F)
 train.yes<-BankAF.yes[index.yes,]
 test.yes<-BankAF.yes[-index.yes,]
 
-index.no<-sample(1:dim(BankAF.no)[1],floor(0.1*dim(BankAF.no)),replace=F)
+index.no<-sample(1:dim(BankAF.no)[1],DimNo,replace=F)
 train.no<-BankAF.no[index.no,]
 test.no<-BankAF.no[-index.no,]
 
@@ -90,9 +96,10 @@ BankAF.test = BankAF.test %>% dplyr::select(-c(duration, ID))
 rm(test.no, test.yes, train.no, train.yes, BankAF.no, BankAF.yes)
 ```
 
+
 ```{r}
 # Creating Step Log model from original variables - full model
-full.log <- glm(Subscription ~ ., family = 'binomial', data = BankAF.train)
+full.log <- glm(Subscription ~ ., family = 'binomial', data = BankAF.train[,-21])
 step.log <- full.log %>% stepAIC(trace = FALSE)
 
 ```
@@ -100,8 +107,7 @@ step.log <- full.log %>% stepAIC(trace = FALSE)
 
 ```{r}
 # Build Lasso Model on train set
-Bank.Train.x <- model.matrix(Subscription ~ pdays + emp.var.rate + job + previous + cons.price.idx + cons.conf.idx + euribor3m + nr.employed
-                             + education + default + contact + poutcome + month + PreviousContact + PreviousSuccess + Workforce, BankAF.train)
+Bank.Train.x <- model.matrix(Subscription ~ ., BankAF.train[,-21])
 Bank.Train.y <- BankAF.train[,20]
 
 cvfit <- cv.glmnet(Bank.Train.x, Bank.Train.y, family = "binomial", type.measure = "class", nlambda = 1000)
@@ -125,44 +131,48 @@ finalmodel <- glmnet(Bank.Train.x, Bank.Train.y, family = "binomial", lambda = c
 
 ```{r}
 # Get predictions from Lasso Model on Test set
-Bank.Test.x <- model.matrix(Subscription ~ pdays + emp.var.rate + job + previous + cons.price.idx + cons.conf.idx + euribor3m + nr.employed
-                             + education + default + contact + poutcome + month + PreviousContact + PreviousSuccess + Workforce, BankAF.test)
+Bank.Test.x <- model.matrix(Subscription ~ ., BankAF.test[,-21])
 
 fit.pred.lasso <- predict(finalmodel, newx = Bank.Test.x, type = "response")
 
-p = data.frame(Subs = BankAF.test$Subscription,Preds = fit.pred.lasso)
+p = data.frame(Subs = BankAF.test$Subscription, Preds = fit.pred.lasso)
 names(p)[2] <- 'Preds'
-p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_histogram(binwidth = 0.01) + facet_wrap(~Subs)
+p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxplot() + facet_wrap(~Subs)
 #write.csv(data.frame(BankAF.test$Subscription,fit.pred.lasso), file = "F:/R For Real/Stats-2-Project-2/LassoPred.csv")
 
-fit.pred.step <- predict(step.log, newdata = BankAF.test, type= "response")
+#fit.pred.step <- predict(step.log, newdata = BankAF.test[,-21], type= "response")
 ```
 
 ```{r}
-cutoff.lasso <- 0.4
-cutoff.step <- 0.4
+cutoff.lasso <- 0.385
+cutoff.step <- 0.3
 
 class.lasso <- factor(ifelse(fit.pred.lasso > cutoff.lasso, 'yes','no'),levels = c('no','yes'))
-class.step <- factor(ifelse(fit.pred.step > cutoff.step, 'yes','no'),levels = c('no','yes'))
+#class.step <- factor(ifelse(fit.pred.step > cutoff.step, 'yes','no'),levels = c('no','yes'))
 
 print("Confusion Lasso")
 confusionMatrix(class.lasso, BankAF.test$Subscription)
 cat("**********************************************\n**********************************************\n\n")
 print("Confusion Step")
-confusionMatrix(class.step, BankAF.test$Subscription)
+#confusionMatrix(class.step, BankAF.test$Subscription)
 ```
 
 ```{r}
-cutoff.origin <- 0.4
+# Custom Block - copy
+cutoff.origin <- 0.43
 
-simple.log<-glm(Subscription ~ poutcome + emp.var.rate + contact + nr.employed + cons.price.idx + cons.conf.idx + emp.var.rate*poutcome + contact*day_of_week 
-                + PreviousContact + PreviousSuccess + Workforce,family="binomial",data=BankAF.train)
+simple.log<-glm(Subscription ~ pdays+nr.employed+emp.var.rate+euribor3m,
+                family="binomial",data=BankAF.train)
 
 fit.pred.origin<-predict(simple.log,newdata=BankAF.test,type="response")
 
 results.origin<-prediction(fit.pred.origin,BankAF.test$Subscription,label.ordering=c("no","yes"))
 
 class.origin <- factor(ifelse(fit.pred.origin > cutoff.origin, 'yes','no'),levels = c('no','yes'))
+
+p = data.frame(Subs = BankAF.test$Subscription, Preds = fit.pred.origin)
+names(p)[2] <- 'Preds'
+p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxplot() + facet_wrap(~Subs)
 
 print("Confusion Custom")
 confusionMatrix(class.origin, BankAF.test$Subscription)
@@ -172,17 +182,67 @@ roc.origin=performance(results.origin,measure = "tnr", x.measure = "fnr")
 
 ```{r}
 # Creating step log model with PCs
-## Note this will only run if you have created the Princpal Components from PCA-LDA-QDA.Rmd
+
+# Creates a numeric data set for PCA
+BankAF.Numeric<- BankAF %>% dplyr::select(age, campaign,pdays, previous, emp.var.rate, cons.price.idx, cons.conf.idx, euribor3m, nr.employed, SubNum)
+
+# Create Train and test Samples
+BankAF.Numeric.yes <- subset(BankAF.Numeric, SubNum == 1)
+BankAF.Numeric.no <- subset(BankAF.Numeric, SubNum == 0)
+
+set.seed(35)
+index.yes<-sample(1:dim(BankAF.Numeric.yes)[1],DimYes,replace=F)
+train.yes<-BankAF.Numeric.yes[index.yes,]
+test.yes<-BankAF.Numeric.yes[-index.yes,]
+
+index.no<-sample(1:dim(BankAF.Numeric.no)[1],DimNo,replace=F)
+train.no<-BankAF.Numeric.no[index.no,]
+test.no<-BankAF.Numeric.no[-index.no,]
+
+BankAF.train.x <- rbind(train.no, train.yes)
+BankAF.train.y <- BankAF.train.x[,10]
+BankAF.train.y <- as.factor(as.character(BankAF.train.y))
+BankAF.train.x <- BankAF.train.x[,1:9]
+
+
+BankAF.test.x <- rbind(test.no, test.yes)
+BankAF.test.y <- BankAF.test.x[,10]
+BankAF.test.y <- as.factor(as.character(BankAF.test.y))
+BankAF.test.x <- BankAF.test.x[,1:9]
+
+# remove intermediate data sets
+rm(test.no, test.yes, train.no, train.yes, BankAF.Numeric.no, BankAF.Numeric.yes)
+
+# Creating PC Train Set
+pc.result <- prcomp(BankAF.train.x, scale. = TRUE)
+pc.scores <- pc.result$x
+pc.scores <- data.frame(pc.scores)
+pc.scores$SubNum <- BankAF.train.y
+
+pc.result$rotation
+
+
+# Create PC test Set
+pc.result.test <- prcomp(BankAF.test.x, scale = TRUE)
+pc.scores.test <- pc.result.test$x
+pc.scores.test <- data.frame(pc.scores.test)
+
+
 pc.log.full <- glm(SubNum ~ ., family = 'binomial', data = pc.scores)
 pc.step.log <- pc.log.full %>% stepAIC(trace = FALSE)
 
-cutoff.pc = 0.422
+
+cutoff.pc = 0.4
 
 fit.pc.log <- predict(pc.step.log, newdata = pc.scores.test, type = "response")
 
 results.pc.log <- prediction(fit.pc.log, BankAF.test.y, label.ordering = c("0", "1"))
 
 class.pc.log <- factor(ifelse(fit.pc.log > cutoff.pc, "1", "0"), levels = c("0", "1"))
+
+p = data.frame(Subs = BankAF.test$Subscription, Preds = fit.pc.log)
+names(p)[2] <- 'Preds'
+p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxplot() + facet_wrap(~Subs)
 
 print("Confusion Matrix PC")
 confusionMatrix(class.pc.log, BankAF.test.y)
@@ -195,25 +255,49 @@ roc.pc = performance(results.pc.log,measure = "tnr", x.measure = "fnr")
 
 # Get results from predictions
 results.lasso <- prediction(fit.pred.lasso, BankAF.test$Subscription,label.ordering=c("no","yes"))
-results.step <- prediction(fit.pred.step, BankAF.test$Subscription,label.ordering=c("no","yes")) 
+#results.step <- prediction(fit.pred.step, BankAF.test$Subscription,label.ordering=c("no","yes")) 
 
 # look at performance metrics of above predictions
 roc.lasso = performance(results.lasso, measure = "tnr", x.measure = "fnr")
-roc.step = performance(results.step, measure = "tnr", x.measure = 'fnr')
+#roc.step = performance(results.step, measure = "tnr", x.measure = 'fnr')
 
 plot(roc.lasso, col = "red", lty = 1, main = "ROC", colorize = TRUE)
-plot(roc.step, col = "blue1", lty = 2, add = TRUE, colorize = TRUE)
+#plot(roc.step, col = "blue1", lty = 2, add = TRUE, colorize = TRUE)
 plot(roc.origin, col = "darkgreen", lty = 3, add = TRUE, colorize = TRUE)
 plot(roc.pc, col = "darkorchid4", lty = 4, add = TRUE, colorize = TRUE)
 abline(a=0, b= 1)
-#legend("bottomright",legend=c("Lasso","Stepwise","Origin"),col=c("red","blue","green"),lty=1,lwd=1)
-abline(a=0, b= 1)
+#legend("bottomright",legend=c("Lasso","Stepwise","Custom", "PC"),col=c("red","blue","green", "darkorchid4"),lty=1,lwd=1)
+
 ```
 
+Vanilla Train Test
+```{r}
+index_train<-sample(1:dim(BankAF)[1],floor(0.75*dim(BankAF)),replace=F)
+bank_train<-BankAF[index_train,]
+bank_test<-BankAF[-index_train,]
+```
 
+```{r}
+multivar_log=glm(Subscription~pdays+nr.employed+emp.var.rate+euribor3m,
+                 family='binomial',
+                 data=bank_train)
+probabilities<-predict(multivar_log,newdata=bank_test[,names(bank_test)!='Subscription']
+                       ,type="response")
+BankAF.yes <- subset(BankAF, Subscription == "yes")
+BankAF.no <- subset(BankAF, Subscription == "no")
+cutoff=nrow(BankAF.yes)/nrow(BankAF)
+classifications<-factor(ifelse(probabilities>cutoff,"yes","no"),levels=c("no","yes"))
+confusion=table(classifications,bank_test[,'Subscription'])
+mean(classifications==bank_test[,'Subscription'])
+true_positive=confusion[2,2]/sum(confusion[,2])
+true_negative=confusion[1,1]/sum(confusion[,1])
+print("True positive rate is %s")
+true_positive
+print("True negative rate is %s")
+true_negative
 
-
-
+confusionMatrix(confusion)
+```
 
 
 
