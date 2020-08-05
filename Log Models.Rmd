@@ -129,10 +129,12 @@ print("Confusion Custom")
 confusionMatrix(class.step, BankAF.test$Subscription)
 ```
 
+
 # Custom Model - Future Answer to Q2
 ```{r}
 # custom log regression - 61/78
-custom.log <- glm(Subscription ~ emp.var.rate + euribor3m + nr.employed + pdays + month + poutcome + contact + euribor3m*nr.employed,
+custom.log <- glm(Subscription ~ emp.var.rate + euribor3m + nr.employed + pdays + month + poutcome + contact +
+                    euribor3m*nr.employed + emp.var.rate*euribor3m + pdays*month,
                   family = "binomial", data = BankAF.train[,-21])
 
 summary(custom.log)
@@ -149,7 +151,7 @@ p.yes = p %>% group_by(Subs, Preds) %>% subset(Subs == "yes")
 summary(p.no)
 summary(p.yes)
 
-cutoff.custom = 0.341
+cutoff.custom = 0.31
 
 # Lets see how we did
 results.custom <- prediction(fit.pred.custom,BankAF.test$Subscription,label.ordering=c("no","yes"))
