@@ -26,6 +26,7 @@ library(e1071)
 library(glmnet)
 library(ROCR)
 library(forcats)
+library(car)
 ```
 
 
@@ -61,9 +62,12 @@ BankAF$Workforce <- fct_collapse(BankAF$job,
 
 ### Have they had a previous success with this client
 BankAF$PreviousSuccess <- fct_collapse(BankAF$poutcome, "1" = c("success"), "0" = c("nonexistent", "failure"))
+
+BankAF$default <- fct_collapse(BankAF$default, "no" = c("unknown", "no"), "yes" = c("yes"))
 ```
 
 # Logit Models
+## Set Training and Test Sets
 ```{r}
 # Create Train and Test sets ----
 
@@ -96,17 +100,71 @@ BankAF.test = BankAF.test %>% dplyr::select(-c(duration, ID))
 rm(test.no, test.yes, train.no, train.yes, BankAF.no, BankAF.yes)
 ```
 
-
+# Step Model
 ```{r}
-# Creating Step Log model from original variables - full model
-full.log <- glm(Subscription ~ ., family = 'binomial', data = BankAF.train[,-21])
+# Creating Step Log model from original variables - full model  75/70
+full.log <- glm(Subscription ~ ., family = 'binomial', data = BankAF.train[,-c(5,21)])
 step.log <- full.log %>% stepAIC(trace = FALSE)
 
+# Get predictions from Test set
+fit.pred.step <- predict(step.log, newdata = BankAF.test, type= "response")
+
+# look at separation between Yes and No Prediction Probs
+p = data.frame(Subs = BankAF.test$Subscription, Preds = fit.pred.step)
+names(p)[2] <- 'Preds'
+p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxplot() + facet_grid(rows = p$Subs)
+p.no = p %>% group_by(Subs, Preds) %>% subset(Subs == "no")
+summary(p.no)
+
+# Set cutoff for probs 
+cutoff.step = 0.3550
+
+
+# Lets see how we did
+results.step <- prediction(fit.pred.step,BankAF.test$Subscription,label.ordering=c("no","yes"))
+
+class.step <- factor(ifelse(fit.pred.step > cutoff.step, 'yes','no'),levels = c('no','yes'))
+
+print("Confusion Custom")
+confusionMatrix(class.step, BankAF.test$Subscription)
 ```
 
-
+# Custom Model - Future Answer to Q2
 ```{r}
-# Build Lasso Model on train set
+# custom log regression - 61/78
+custom.log <- glm(Subscription ~ emp.var.rate + euribor3m + nr.employed + pdays + month + poutcome + contact + euribor3m*nr.employed,
+                  family = "binomial", data = BankAF.train[,-21])
+
+summary(custom.log)
+#vif(custom.log)
+cat("**********************************************\n**********************************************\n\n")
+fit.pred.custom <- predict(custom.log, newdata = BankAF.test, type= "response")
+
+p = data.frame(Subs = BankAF.test$Subscription, Preds = fit.pred.custom)
+names(p)[2] <- 'Preds'
+p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxplot() + facet_grid(rows = p$Subs)
+p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_histogram(binwidth = 0.01) + facet_grid(rows = p$Subs)
+p.no = p %>% group_by(Subs, Preds) %>% subset(Subs == "no")
+p.yes = p %>% group_by(Subs, Preds) %>% subset(Subs == "yes")
+summary(p.no)
+summary(p.yes)
+
+cutoff.custom = 0.341
+
+# Lets see how we did
+results.custom <- prediction(fit.pred.custom,BankAF.test$Subscription,label.ordering=c("no","yes"))
+
+class.custom <- factor(ifelse(fit.pred.custom >= cutoff.custom, 'yes','no'),levels = c('no','yes'))
+
+roc.custom=performance(results.custom,measure = "tnr", x.measure = "fnr")
+
+print("Confusion Custom")
+confusionMatrix(class.custom, BankAF.test$Subscription)
+```
+
+# Lasso Model
+```{r}
+# Build Lasso Model on train set 74/72
 Bank.Train.x <- model.matrix(Subscription ~ ., BankAF.train[,-21])
 Bank.Train.y <- BankAF.train[,20]
 
@@ -126,10 +184,7 @@ cvfit$lambda.min
 
 # Final Model
 finalmodel <- glmnet(Bank.Train.x, Bank.Train.y, family = "binomial", lambda = cvfit$lambda.min)
-```
 
-
-```{r}
 # Get predictions from Lasso Model on Test set
 Bank.Test.x <- model.matrix(Subscription ~ ., BankAF.test[,-21])
 
@@ -137,51 +192,49 @@ fit.pred.lasso <- predict(finalmodel, newx = Bank.Test.x, type = "response")
 
 p = data.frame(Subs = BankAF.test$Subscription, Preds = fit.pred.lasso)
 names(p)[2] <- 'Preds'
-p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxplot() + facet_wrap(~Subs)
-#write.csv(data.frame(BankAF.test$Subscription,fit.pred.lasso), file = "F:/R For Real/Stats-2-Project-2/LassoPred.csv")
+p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxplot() + facet_grid(rows = p$Subs)
 
-#fit.pred.step <- predict(step.log, newdata = BankAF.test[,-21], type= "response")
-```
+p.no = p %>% group_by(Subs, Preds) %>% subset(Subs == "no")
+summary(p.no)
 
-```{r}
-cutoff.lasso <- 0.385
-cutoff.step <- 0.3
+# Set Cutoff
+cutoff.lasso <- 0.39
 
 class.lasso <- factor(ifelse(fit.pred.lasso > cutoff.lasso, 'yes','no'),levels = c('no','yes'))
-#class.step <- factor(ifelse(fit.pred.step > cutoff.step, 'yes','no'),levels = c('no','yes'))
 
 print("Confusion Lasso")
 confusionMatrix(class.lasso, BankAF.test$Subscription)
-cat("**********************************************\n**********************************************\n\n")
-print("Confusion Step")
-#confusionMatrix(class.step, BankAF.test$Subscription)
 ```
 
+# Answer to Question 1
 ```{r}
-# Custom Block - copy
-cutoff.origin <- 0.43
+# Custom Block - copy 72/72.5
+cutoff.simple <- 0.43
 
 simple.log<-glm(Subscription ~ pdays+nr.employed+emp.var.rate+euribor3m,
                 family="binomial",data=BankAF.train)
 
-fit.pred.origin<-predict(simple.log,newdata=BankAF.test,type="response")
+fit.pred.simple<-predict(simple.log,newdata=BankAF.test,type="response")
 
-results.origin<-prediction(fit.pred.origin,BankAF.test$Subscription,label.ordering=c("no","yes"))
+results.simple<-prediction(fit.pred.simple,BankAF.test$Subscription,label.ordering=c("no","yes"))
 
-class.origin <- factor(ifelse(fit.pred.origin > cutoff.origin, 'yes','no'),levels = c('no','yes'))
+class.simple <- factor(ifelse(fit.pred.simple > cutoff.simple, 'yes','no'),levels = c('no','yes'))
 
-p = data.frame(Subs = BankAF.test$Subscription, Preds = fit.pred.origin)
+p = data.frame(Subs = BankAF.test$Subscription, Preds = fit.pred.simple)
 names(p)[2] <- 'Preds'
-p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxplot() + facet_wrap(~Subs)
+p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxplot() + facet_grid(rows = p$Subs)
+
+p.no = p %>% subset(Subs == "no")
+summary(p.no)
 
 print("Confusion Custom")
-confusionMatrix(class.origin, BankAF.test$Subscription)
+confusionMatrix(class.simple, BankAF.test$Subscription)
 
-roc.origin=performance(results.origin,measure = "tnr", x.measure = "fnr")
+roc.simple=performance(results.simple,measure = "tnr", x.measure = "fnr")
 ```
 
 ```{r}
-# Creating step log model with PCs
+# Creating step log model with PCs -  this didnt work at all
 
 # Creates a numeric data set for PCA
 BankAF.Numeric<- BankAF %>% dplyr::select(age, campaign,pdays, previous, emp.var.rate, cons.price.idx, cons.conf.idx, euribor3m, nr.employed, SubNum)
@@ -242,7 +295,7 @@ class.pc.log <- factor(ifelse(fit.pc.log > cutoff.pc, "1", "0"), levels = c("0",
 
 p = data.frame(Subs = BankAF.test$Subscription, Preds = fit.pc.log)
 names(p)[2] <- 'Preds'
-p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxplot() + facet_wrap(~Subs)
+p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxplot() + facet_grid(rows = p$Subs)
 
 print("Confusion Matrix PC")
 confusionMatrix(class.pc.log, BankAF.test.y)
@@ -255,16 +308,16 @@ roc.pc = performance(results.pc.log,measure = "tnr", x.measure = "fnr")
 
 # Get results from predictions
 results.lasso <- prediction(fit.pred.lasso, BankAF.test$Subscription,label.ordering=c("no","yes"))
-#results.step <- prediction(fit.pred.step, BankAF.test$Subscription,label.ordering=c("no","yes")) 
+results.step <- prediction(fit.pred.step, BankAF.test$Subscription,label.ordering=c("no","yes")) 
 
 # look at performance metrics of above predictions
 roc.lasso = performance(results.lasso, measure = "tnr", x.measure = "fnr")
-#roc.step = performance(results.step, measure = "tnr", x.measure = 'fnr')
+roc.step = performance(results.step, measure = "tnr", x.measure = 'fnr')
 
-plot(roc.lasso, col = "red", lty = 1, main = "ROC", colorize = TRUE)
-#plot(roc.step, col = "blue1", lty = 2, add = TRUE, colorize = TRUE)
-plot(roc.origin, col = "darkgreen", lty = 3, add = TRUE, colorize = TRUE)
-plot(roc.pc, col = "darkorchid4", lty = 4, add = TRUE, colorize = TRUE)
+plot(roc.lasso, col = "red", lty = 1, main = "ROC")
+plot(roc.step, col = "blue1", lty = 2, add = TRUE)
+plot(roc.simple, col = "darkgreen", lty = 3, add = TRUE)
+plot(roc.custom, col = "darkorchid4", lty = 4, add = TRUE)
 abline(a=0, b= 1)
 #legend("bottomright",legend=c("Lasso","Stepwise","Custom", "PC"),col=c("red","blue","green", "darkorchid4"),lty=1,lwd=1)
 
