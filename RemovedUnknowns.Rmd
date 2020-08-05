@@ -1,0 +1,246 @@
+---
+title: "RmUnknown"
+author: "Adam Canton"
+date: "8/5/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(magrittr)
+library(dplyr)
+library(tidyverse)
+library(olsrr)
+library(ggplot2)
+library(ggcorrplot)
+library(GGally)
+library(naniar)
+library(reshape2)
+library(ggthemes)
+library(cowplot)
+library(aod)
+library(ROCR)
+library(MASS)
+library(caret)
+library(e1071)
+library(glmnet)
+library(ROCR)
+library(forcats)
+library(car)
+library(class)
+
+```
+
+```{r}
+# Grab the file Bank Additional Full - Fill in your file
+BankAF <- read.csv(file = "F:/R For Real/Stats-2-Project-2/bank-additional-full.csv", sep = ";", header = TRUE)
+
+# Change the name of the response from y to Subscription
+names(BankAF)[21] <- "Subscription"
+ID <- seq(1,41188,1)
+BankAF <- cbind(BankAF, ID)
+
+# SubNum 1:yes 0:no
+BankAF <- BankAF %>% mutate(SubNum = ifelse(Subscription == "yes",1,0))
+
+BankAF <- BankAF[,c(22,1:21,23)]
+
+
+cat_types <- c(1,3:11,16,22) #<---- assign index values of the categorical variables
+for(i in cat_types){
+  print(colnames(BankAF[i]))
+  print(BankAF %>% count(BankAF[,i]))
+}
+# Creates a numeric data set for PCA
+#BankAF.Numeric<- BankAF %>% dplyr::select(age, campaign,pdays, previous, emp.var.rate, cons.price.idx, cons.conf.idx, euribor3m, nr.employed, SubNum)
+```
+
+```{r}
+BankAF.NA <- unknownToNA(BankAF[,cat_types], unknown = "unknown")
+BankAF.NA <- cbind(BankAF.NA$ID, BankAF$age,BankAF.NA[,2:10],BankAF[,13:15],BankAF.NA[,11],BankAF[,17:23])
+names(BankAF.NA)[1] <- 'ID'
+names(BankAF.NA)[2] <- "age"
+names(BankAF.NA)[15] <- "poutcome"
+
+```
+
+```{r}
+# No Apparent NA Values, need to check for other NA identifiers
+gg_miss_var(BankAF.NA)
+
+na_count <- sapply(BankAF.NA, function(y) sum(length(which(is.na(y)))))
+na_count <- data.frame(na_count)
+na_count
+```
+
+```{r}
+BankAF.NA = BankAF.NA %>% na.omit()
+```
+
+```{r}
+# Create Train and Test sets ----
+
+# How Many yes and no?
+DimYes <- 3000 
+DimNo <- 3000
+
+# Going to try to create 2 data sets, one for Subscription-yes one for Subscription-no, Sample each one proportionally then recombine into train and test sets
+BankAF.yes <- subset(BankAF.NA, Subscription == "yes")
+BankAF.no <- subset(BankAF.NA, Subscription == "no")
+
+set.seed(35)
+index.yes<-sample(1:dim(BankAF.yes)[1],DimYes,replace=F)
+train.yes<-BankAF.yes[index.yes,]
+test.yes<-BankAF.yes[-index.yes,]
+
+index.no<-sample(1:dim(BankAF.no)[1],DimNo,replace=F)
+train.no<-BankAF.no[index.no,]
+test.no<-BankAF.no[-index.no,]
+
+BankAF.NA.train <- rbind(train.no, train.yes)
+BankAF.NA.test <- rbind(test.no, test.yes)
+
+# Getting rid of duration  - it will predict nearly perfectly - with this in mean prediction error = 0
+# Also have to get rid of ID since it was being selected as good explanatory variable
+BankAF.NA.train = BankAF.NA.train %>% dplyr::select(-c( ID))
+BankAF.NA.test = BankAF.NA.test %>% dplyr::select(-c(ID))
+
+# remove intermediate data sets
+rm(test.no, test.yes, train.no, train.yes, BankAF.no, BankAF.yes)
+```
+
+```{r}
+# Creating Step Log model from original variables - full model  75/70
+full.log <- glm(Subscription ~ ., family = 'binomial', data = BankAF.NA.train[,-c(5,21)])
+step.log <- full.log %>% stepAIC(trace = FALSE)
+
+# Get predictions from Test set
+fit.pred.step <- predict(step.log, newdata = BankAF.NA.test, type= "response")
+
+# look at separation between Yes and No Prediction Probs
+p = data.frame(Subs = BankAF.NA.test$Subscription, Preds = fit.pred.step)
+names(p)[2] <- 'Preds'
+p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxplot() + facet_grid(rows = p$Subs)
+p.no = p %>% group_by(Subs, Preds) %>% subset(Subs == "no")
+summary(p.no)
+
+# Set cutoff for probs 
+cutoff.step = 0.39
+
+
+# Lets see how we did
+results.step <- prediction(fit.pred.step,BankAF.NA.test$Subscription,label.ordering=c("no","yes"))
+
+class.step <- factor(ifelse(fit.pred.step > cutoff.step, 'yes','no'),levels = c('no','yes'))
+
+print("Confusion Custom")
+confusionMatrix(class.step, BankAF.NA.test$Subscription)
+```
+
+```{r}
+# custom log regression - 61/78
+custom.log <- glm(Subscription ~ emp.var.rate + euribor3m + nr.employed + pdays + month + poutcome + contact +
+                    euribor3m*nr.employed + emp.var.rate*euribor3m,
+                  family = "binomial", data = BankAF.NA.train[,-21])
+
+summary(custom.log)
+#vif(custom.log)
+cat("**********************************************\n**********************************************\n\n")
+fit.pred.custom <- predict(custom.log, newdata = BankAF.NA.test, type= "response")
+
+p = data.frame(Subs = BankAF.NA.test$Subscription, Preds = fit.pred.custom)
+names(p)[2] <- 'Preds'
+p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxplot() + facet_grid(rows = p$Subs)
+p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_histogram(binwidth = 0.01) + facet_grid(rows = p$Subs)
+p.no = p %>% group_by(Subs, Preds) %>% subset(Subs == "no")
+p.yes = p %>% group_by(Subs, Preds) %>% subset(Subs == "yes")
+summary(p.no)
+summary(p.yes)
+
+cutoff.custom = 0.3381
+
+# Lets see how we did
+results.custom <- prediction(fit.pred.custom,BankAF.NA.test$Subscription,label.ordering=c("no","yes"))
+
+class.custom <- factor(ifelse(fit.pred.custom >= cutoff.custom, 'yes','no'),levels = c('no','yes'))
+
+roc.custom=performance(results.custom,measure = "tnr", x.measure = "fnr")
+
+print("Confusion Custom")
+confusionMatrix(class.custom, BankAF.NA.test$Subscription)
+```
+
+```{r}
+# Build Lasso Model on train set 74/72
+Bank.NA.Train.x <- model.matrix(Subscription ~ ., BankAF.NA.train[,-21])
+Bank.NA.Train.y <- BankAF.NA.train[,20]
+
+cvfit <- cv.glmnet(Bank.NA.Train.x, Bank.NA.Train.y, family = "binomial", type.measure = "class", nlambda = 1000)
+
+plot(cvfit)
+coef(cvfit, s = "lambda.min")
+
+# Cv Missclassification
+print("Cv Error Rate:")
+cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
+
+
+# Optimal Penalty
+print("Penalty Value:")
+cvfit$lambda.min
+
+# Final Model
+finalmodel <- glmnet(Bank.NA.Train.x, Bank.NA.Train.y, family = "binomial", lambda = cvfit$lambda.min)
+
+# Get predictions from Lasso Model on Test set
+Bank.NA.Test.x <- model.matrix(Subscription ~ ., BankAF.NA.test[,-21])
+
+fit.pred.lasso <- predict(finalmodel, newx = Bank.NA.Test.x, type = "response")
+
+p = data.frame(Subs = BankAF.NA.test$Subscription, Preds = fit.pred.lasso)
+names(p)[2] <- 'Preds'
+p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxplot() + facet_grid(rows = p$Subs)
+
+p.no = p %>% group_by(Subs, Preds) %>% subset(Subs == "no")
+summary(p.no)
+
+# Set Cutoff
+cutoff.lasso <- 0.405
+
+class.lasso <- factor(ifelse(fit.pred.lasso > cutoff.lasso, 'yes','no'),levels = c('no','yes'))
+
+print("Confusion Lasso")
+confusionMatrix(class.lasso, BankAF.NA.test$Subscription)
+```
+
+```{r}
+# Custom Block - copy 72/72.5
+
+
+simple.log<-glm(Subscription ~ pdays+nr.employed+emp.var.rate+euribor3m,
+                family="binomial",data=BankAF.NA.train)
+
+fit.pred.simple<-predict(simple.log,newdata=BankAF.NA.test,type="response")
+
+results.simple<-prediction(fit.pred.simple,BankAF.NA.test$Subscription,label.ordering=c("no","yes"))
+
+class.simple <- factor(ifelse(fit.pred.simple > cutoff.simple, 'yes','no'),levels = c('no','yes'))
+
+p = data.frame(Subs = BankAF.NA.test$Subscription, Preds = fit.pred.simple)
+names(p)[2] <- 'Preds'
+p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxplot() + facet_grid(rows = p$Subs)
+p.yes = p %>% subset(Subs == "yes")
+p.no = p %>% subset(Subs == "no")
+summary(p.no)
+summary(p.yes)
+
+
+cutoff.simple <- 0.43
+class.simple <- factor(ifelse(fit.pred.simple > cutoff.simple, 'yes','no'),levels = c('no','yes'))
+print("Confusion Custom")
+confusionMatrix(class.simple, BankAF.NA.test$Subscription)
+
+roc.simple=performance(results.simple,measure = "tnr", x.measure = "fnr")
+```
+
+
