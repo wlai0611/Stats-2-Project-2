@@ -1,0 +1,151 @@
+---
+title: "KNN Model"
+author: "Adam Canton"
+date: "8/5/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(magrittr)
+library(dplyr)
+library(tidyverse)
+library(olsrr)
+library(ggplot2)
+library(ggcorrplot)
+library(GGally)
+library(naniar)
+library(reshape2)
+library(ggthemes)
+library(cowplot)
+library(aod)
+library(ROCR)
+library(MASS)
+library(caret)
+library(e1071)
+library(glmnet)
+library(ROCR)
+library(forcats)
+library(car)
+library(class)
+```
+
+```{r}
+# Grab the file Bank Additional Full - Fill in your file
+BankAF <- read.csv(file = "F:/R For Real/Stats-2-Project-2/bank-additional-full.csv", sep = ";", header = TRUE)
+
+# Change the name of the response from y to Subscription
+names(BankAF)[21] <- "Subscription"
+
+# SubNum 1:yes 0:no
+BankAF <- BankAF %>% mutate(SubNum = ifelse(Subscription == "yes",1,0))
+
+# Creates a numeric data set for PCA
+BankAF.Numeric <- BankAF %>% dplyr::select(age, campaign,pdays, previous, emp.var.rate, cons.price.idx, cons.conf.idx, euribor3m, nr.employed, SubNum)
+BankAF.Scale <- data.frame(scale(BankAF.Numeric[,-10]))
+BankAF.Scale$SubNum <- BankAF.Numeric[,10]
+```
+
+```{r}
+# Create Train and Test sets ----
+
+# How Many yes and no?
+DimYes <- 3000 
+DimNo <- 3000
+
+# Going to try to create 2 data sets, one for Subscription-yes one for Subscription-no, Sample each one proportionally then recombine into train and test sets
+BankAF.yes <- subset(BankAF.Scale, SubNum == 1)
+BankAF.no <- subset(BankAF.Scale, SubNum == 0)
+
+set.seed(35)
+index.yes<-sample(1:dim(BankAF.yes)[1],DimYes,replace=F)
+train.yes<-BankAF.yes[index.yes,]
+test.yes<-BankAF.yes[-index.yes,]
+
+index.no<-sample(1:dim(BankAF.no)[1],DimNo,replace=F)
+train.no<-BankAF.no[index.no,]
+test.no<-BankAF.no[-index.no,]
+
+BankAF.Knntrain <- rbind(train.no, train.yes)
+BankAF.Knntest <- rbind(test.no, test.yes)
+
+
+# remove intermediate data sets
+rm(test.no, test.yes, train.no, train.yes, BankAF.no, BankAF.yes)
+```
+
+
+```{r}
+# Knn with scaled original variables 80/65
+knnvector1 <- c(1:9)
+
+classifications1 = knn(BankAF.Knntrain[,knnvector1], BankAF.Knntest[, knnvector1], BankAF.Knntrain$SubNum, prob = TRUE, k = 11)
+
+prob <- attr(classifications1, "prob")
+
+confusionMatrix(table(classifications1, BankAF.Knntest$SubNum))
+```
+
+
+
+```{r}
+# Knn with PCs 37/44
+
+# Create Train and test Samples
+BankAF.Numeric.yes <- subset(BankAF.Numeric, SubNum == 1)
+BankAF.Numeric.no <- subset(BankAF.Numeric, SubNum == 0)
+
+DimYes <- 3000
+DimNo <- 3000
+
+set.seed(35)
+index.yes<-sample(1:dim(BankAF.Numeric.yes)[1],DimYes,replace=F)
+train.yes<-BankAF.Numeric.yes[index.yes,]
+test.yes<-BankAF.Numeric.yes[-index.yes,]
+
+index.no<-sample(1:dim(BankAF.Numeric.no)[1],DimNo,replace=F)
+train.no<-BankAF.Numeric.no[index.no,]
+test.no<-BankAF.Numeric.no[-index.no,]
+
+BankAF.train.x <- rbind(train.no, train.yes)
+BankAF.train.y <- BankAF.train.x[,10]
+BankAF.train.y <- as.factor(as.character(BankAF.train.y))
+BankAF.train.x <- BankAF.train.x[,1:9]
+
+
+BankAF.test.x <- rbind(test.no, test.yes)
+BankAF.test.y <- BankAF.test.x[,10]
+BankAF.test.y <- as.factor(as.character(BankAF.test.y))
+BankAF.test.x <- BankAF.test.x[,1:9]
+
+
+
+# remove intermediate data sets
+rm(test.no, test.yes, train.no, train.yes, BankAF.Numeric.no, BankAF.Numeric.yes)
+
+# Creating PC Train Set
+pc.result <- prcomp(BankAF.train.x, scale. = TRUE)
+pc.scores <- pc.result$x
+pc.scores <- data.frame(pc.scores)
+pc.scores$SubNum <- BankAF.train.y
+
+pc.result$rotation
+
+
+# Create PC test Set
+pc.result.test <- prcomp(BankAF.test.x, scale = TRUE)
+pc.scores.test <- pc.result.test$x
+pc.scores.test <- data.frame(pc.scores.test)
+pc.scores.test$SubNum <- BankAF.test.y
+
+
+
+knnvector1 <- c(1,2,3)
+classifications2 <- knn(pc.scores[, knnvector1], pc.scores.test[,knnvector1], pc.scores$SubNum, prob = TRUE, k = 3)
+
+prob2 <- attr(classifications2, "prob")
+
+confusionMatrix(table(classifications2, pc.scores.test$SubNum))
+
+```
+
