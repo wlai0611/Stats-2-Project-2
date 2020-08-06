@@ -93,8 +93,8 @@ BankAF.test <- rbind(test.no, test.yes)
 
 # Getting rid of duration  - it will predict nearly perfectly - with this in mean prediction error = 0
 # Also have to get rid of ID since it was being selected as good explanatory variable
-BankAF.train = BankAF.train %>% dplyr::select(-c(duration, ID))
-BankAF.test = BankAF.test %>% dplyr::select(-c(duration, ID))
+BankAF.train = BankAF.train %>% dplyr::select(-c(ID))
+BankAF.test = BankAF.test %>% dplyr::select(-c(ID))
 
 # remove intermediate data sets
 rm(test.no, test.yes, train.no, train.yes, BankAF.no, BankAF.yes)
@@ -103,7 +103,7 @@ rm(test.no, test.yes, train.no, train.yes, BankAF.no, BankAF.yes)
 # Step Model
 ```{r}
 # Creating Step Log model from original variables - full model  75/70
-full.log <- glm(Subscription ~ ., family = 'binomial', data = BankAF.train[,-c(5,21)])
+full.log <- glm(Subscription ~ ., family = 'binomial', data = BankAF.train[,-c(5,22)])
 step.log <- full.log %>% stepAIC(trace = FALSE)
 
 # Get predictions from Test set
@@ -117,7 +117,7 @@ p.no = p %>% group_by(Subs, Preds) %>% subset(Subs == "no")
 summary(p.no)
 
 # Set cutoff for probs 
-cutoff.step = 0.3550
+cutoff.step = 0.35
 
 
 # Lets see how we did
@@ -133,9 +133,9 @@ confusionMatrix(class.step, BankAF.test$Subscription)
 # Custom Model - Future Answer to Q2
 ```{r}
 # custom log regression - 61/78
-custom.log <- glm(Subscription ~ emp.var.rate + euribor3m + nr.employed + pdays + month + poutcome + contact +
-                    euribor3m*nr.employed + emp.var.rate*euribor3m + pdays*month,
-                  family = "binomial", data = BankAF.train[,-21])
+custom.log <- glm(Subscription ~ emp.var.rate + euribor3m + nr.employed + pdays + month + poutcome + contact + duration +
+                    euribor3m*nr.employed + emp.var.rate*euribor3m + duration*campaign,
+                  family = "binomial", data = BankAF.train[,-22])
 
 summary(custom.log)
 #vif(custom.log)
@@ -151,7 +151,7 @@ p.yes = p %>% group_by(Subs, Preds) %>% subset(Subs == "yes")
 summary(p.no)
 summary(p.yes)
 
-cutoff.custom = 0.31
+cutoff.custom = 0.4
 
 # Lets see how we did
 results.custom <- prediction(fit.pred.custom,BankAF.test$Subscription,label.ordering=c("no","yes"))
@@ -167,8 +167,8 @@ confusionMatrix(class.custom, BankAF.test$Subscription)
 # Lasso Model
 ```{r}
 # Build Lasso Model on train set 74/72
-Bank.Train.x <- model.matrix(Subscription ~ ., BankAF.train[,-21])
-Bank.Train.y <- BankAF.train[,20]
+Bank.Train.x <- model.matrix(Subscription ~ ., BankAF.train[,-22])
+Bank.Train.y <- BankAF.train[,21]
 
 cvfit <- cv.glmnet(Bank.Train.x, Bank.Train.y, family = "binomial", type.measure = "class", nlambda = 1000)
 
@@ -188,7 +188,7 @@ cvfit$lambda.min
 finalmodel <- glmnet(Bank.Train.x, Bank.Train.y, family = "binomial", lambda = cvfit$lambda.min)
 
 # Get predictions from Lasso Model on Test set
-Bank.Test.x <- model.matrix(Subscription ~ ., BankAF.test[,-21])
+Bank.Test.x <- model.matrix(Subscription ~ ., BankAF.test[,-22])
 
 fit.pred.lasso <- predict(finalmodel, newx = Bank.Test.x, type = "response")
 
@@ -200,7 +200,7 @@ p.no = p %>% group_by(Subs, Preds) %>% subset(Subs == "no")
 summary(p.no)
 
 # Set Cutoff
-cutoff.lasso <- 0.39
+cutoff.lasso <- 0.45
 
 class.lasso <- factor(ifelse(fit.pred.lasso > cutoff.lasso, 'yes','no'),levels = c('no','yes'))
 
@@ -211,14 +211,14 @@ confusionMatrix(class.lasso, BankAF.test$Subscription)
 # Answer to Question 1
 ```{r}
 # Custom Block - copy 72/72.5
-cutoff.simple <- 0.43
+cutoff.simple <- 0.41
 
-simple.log<-glm(Subscription ~ pdays+nr.employed+emp.var.rate+euribor3m,
+simple.log<-glm(Subscription ~ pdays+nr.employed+emp.var.rate+euribor3m + duration,
                 family="binomial",data=BankAF.train)
 
-fit.pred.simple<-predict(simple.log,newdata=BankAF.test,type="response")
+fit.pred.simple <- predict(simple.log,newdata=BankAF.test,type="response")
 
-results.simple<-prediction(fit.pred.simple,BankAF.test$Subscription,label.ordering=c("no","yes"))
+results.simple <- prediction(fit.pred.simple,BankAF.test$Subscription,label.ordering=c("no","yes"))
 
 class.simple <- factor(ifelse(fit.pred.simple > cutoff.simple, 'yes','no'),levels = c('no','yes'))
 
