@@ -47,12 +47,15 @@ BankAF.Numeric<- BankAF %>% dplyr::select(age, campaign,pdays, previous, emp.var
 BankAF.Numeric.yes <- subset(BankAF.Numeric, SubNum == 1)
 BankAF.Numeric.no <- subset(BankAF.Numeric, SubNum == 0)
 
+DimYes <- 3000
+DimNo <- 3000
+
 set.seed(35)
-index.yes<-sample(1:dim(BankAF.Numeric.yes)[1],floor(0.98*dim(BankAF.Numeric.yes)),replace=F)
+index.yes<-sample(1:dim(BankAF.Numeric.yes)[1],DimYes,replace=F)
 train.yes<-BankAF.Numeric.yes[index.yes,]
 test.yes<-BankAF.Numeric.yes[-index.yes,]
 
-index.no<-sample(1:dim(BankAF.Numeric.no)[1],floor(0.1*dim(BankAF.Numeric.no)),replace=F)
+index.no<-sample(1:dim(BankAF.Numeric.no)[1],DimNo,replace=F)
 train.no<-BankAF.Numeric.no[index.no,]
 test.no<-BankAF.Numeric.no[-index.no,]
 
@@ -88,6 +91,8 @@ pc.result$rotation
 pc.result.test <- prcomp(BankAF.test.x, scale = TRUE)
 pc.scores.test <- pc.result.test$x
 pc.scores.test <- data.frame(pc.scores.test)
+pc.scores.test$SubNum <- BankAF.test.y
+
 
 #Scree plot - 2 or 5 or 7
 pc.eigen<-(pc.result$sdev)^2
