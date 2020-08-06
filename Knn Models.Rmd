@@ -89,7 +89,7 @@ confusionMatrix(table(classifications1, BankAF.Knntest$SubNum))
 
 
 ```{r}
-# Knn with PCs 37/44
+# Knn with PCs 35/78
 
 # Create Train and test Samples
 BankAF.Numeric.yes <- subset(BankAF.Numeric, SubNum == 1)
@@ -140,7 +140,7 @@ pc.scores.test$SubNum <- BankAF.test.y
 
 
 
-knnvector1 <- c(1,2,3)
+knnvector1 <- c(2,3)
 classifications2 <- knn(pc.scores[, knnvector1], pc.scores.test[,knnvector1], pc.scores$SubNum, prob = TRUE, k = 3)
 
 prob2 <- attr(classifications2, "prob")
