@@ -101,29 +101,6 @@ BankAF.no <- subset(BankAF, Subscription == "no")
 
 ```
 
-```{r}
-# Create Train and Test sets ----
-## currently train is close to 75/25,
-set.seed(35)
-index.yes<-sample(1:dim(BankAF.yes)[1],floor(0.98*dim(BankAF.yes)),replace=F)
-train.yes<-BankAF.yes[index.yes,]
-test.yes<-BankAF.yes[-index.yes,]
-
-index.no<-sample(1:dim(BankAF.no)[1],floor(0.5*dim(BankAF.no)),replace=F)
-train.no<-BankAF.no[index.no,]
-test.no<-BankAF.no[-index.no,]
-
-BankAF.train <- rbind(train.yes, train.no)
-BankAF.test <- rbind(test.yes, test.no)
-
-# Getting rid of duration  - it will predict nearly perfectly - with this in mean prediction error = 0
-# Also have to get rid of ID since it was being selected as good explanatory variable
-BankAF.train = BankAF.train %>% dplyr::select(-c(duration, ID))
-BankAF.test = BankAF.test %>% dplyr::select(-c(duration, ID))
-
-# remove intermediate data sets
-rm(test.no, test.yes, train.no, train.yes, BankAF.no, BankAF.yes)
-```
 
 ```{r}
 str(BankAF)
@@ -162,7 +139,7 @@ BankAF %>% ggplot(aes(x = cons.conf.idx, fill = Subscription)) + geom_boxplot() 
   facet_wrap(facets = BankAF$Subscription) + xlab("cons conf") + coord_flip()
 
 # Massive difference in median
-BankAF %>% ggplot(aes(x = euribor3m, fill = Subscription)) + geom_histogram(binwidth = 1) + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + facet_wrap(facets = BankAF$Subscription) + xlab("euribor") + coord_flip()
+BankAF %>% ggplot(aes(x = euribor3m, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + facet_wrap(facets = BankAF$Subscription) + xlab("euribor") + coord_flip()
 
 # Large difference
 BankAF %>% ggplot(aes(x = nr.employed, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
