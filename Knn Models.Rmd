@@ -41,9 +41,9 @@ names(BankAF)[21] <- "Subscription"
 BankAF <- BankAF %>% mutate(SubNum = ifelse(Subscription == "yes",1,0))
 
 # Creates a numeric data set for PCA
-BankAF.Numeric <- BankAF %>% dplyr::select(age, campaign,pdays, previous, emp.var.rate, cons.price.idx, cons.conf.idx, euribor3m, nr.employed, SubNum)
-BankAF.Scale <- data.frame(scale(BankAF.Numeric[,-10]))
-BankAF.Scale$SubNum <- BankAF.Numeric[,10]
+BankAF.Numeric <- BankAF %>% dplyr::select(age, campaign, duration, pdays, previous, emp.var.rate, cons.price.idx, cons.conf.idx, euribor3m, nr.employed, SubNum)
+BankAF.Scale <- data.frame(scale(BankAF.Numeric[,-11]))
+BankAF.Scale$SubNum <- BankAF.Numeric[,11]
 ```
 
 ```{r}
@@ -77,12 +77,13 @@ rm(test.no, test.yes, train.no, train.yes, BankAF.no, BankAF.yes)
 
 ```{r}
 # Knn with scaled original variables 80/65
-knnvector1 <- c(1:9)
+knnvector1 <- c(1,2,4:9)
 
-classifications1 = knn(BankAF.Knntrain[,knnvector1], BankAF.Knntest[, knnvector1], BankAF.Knntrain$SubNum, prob = TRUE, k = 11)
+classifications1 = knn(BankAF.Knntrain[,knnvector1], BankAF.Knntest[, knnvector1], BankAF.Knntrain$SubNum, prob = TRUE, k = 7)
 
 prob <- attr(classifications1, "prob")
 
+print("KNN Confusion Matrix -  no Duration")
 confusionMatrix(table(classifications1, BankAF.Knntest$SubNum))
 ```
 
@@ -108,15 +109,15 @@ train.no<-BankAF.Numeric.no[index.no,]
 test.no<-BankAF.Numeric.no[-index.no,]
 
 BankAF.train.x <- rbind(train.no, train.yes)
-BankAF.train.y <- BankAF.train.x[,10]
+BankAF.train.y <- BankAF.train.x[,11]
 BankAF.train.y <- as.factor(as.character(BankAF.train.y))
-BankAF.train.x <- BankAF.train.x[,1:9]
+BankAF.train.x <- BankAF.train.x[,1:10]
 
 
 BankAF.test.x <- rbind(test.no, test.yes)
-BankAF.test.y <- BankAF.test.x[,10]
+BankAF.test.y <- BankAF.test.x[,11]
 BankAF.test.y <- as.factor(as.character(BankAF.test.y))
-BankAF.test.x <- BankAF.test.x[,1:9]
+BankAF.test.x <- BankAF.test.x[,1:10]
 
 
 
@@ -140,8 +141,8 @@ pc.scores.test$SubNum <- BankAF.test.y
 
 
 
-knnvector1 <- c(2,3)
-classifications2 <- knn(pc.scores[, knnvector1], pc.scores.test[,knnvector1], pc.scores$SubNum, prob = TRUE, k = 3)
+knnvector1 <- c(1,2,3,4,5,6,7,8,9)
+classifications2 <- knn(pc.scores[, knnvector1], pc.scores.test[,knnvector1], pc.scores$SubNum, prob = TRUE, k = 5)
 
 prob2 <- attr(classifications2, "prob")
 

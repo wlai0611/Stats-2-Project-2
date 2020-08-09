@@ -28,7 +28,7 @@ library(ROCR)
 library(forcats)
 library(car)
 library(class)
-
+library(gdata)
 ```
 
 ```{r}
@@ -57,11 +57,11 @@ for(i in cat_types){
 
 ```{r}
 BankAF.NA <- unknownToNA(BankAF[,cat_types], unknown = "unknown")
-BankAF.NA <- cbind(BankAF.NA$ID, BankAF$age,BankAF.NA[,2:10],BankAF[,13:15],BankAF.NA[,11],BankAF[,17:23])
+BankAF.NA <- cbind(BankAF.NA$ID, BankAF$age,BankAF.NA[,2:10],BankAF[,13:15],BankAF$duration, BankAF.NA[,11],BankAF[,17:23])
 names(BankAF.NA)[1] <- 'ID'
 names(BankAF.NA)[2] <- "age"
-names(BankAF.NA)[15] <- "poutcome"
-
+names(BankAF.NA)[15] <- "duration"
+names(BankAF.NA)[16] <- "poutcome"
 ```
 
 ```{r}
@@ -78,15 +78,32 @@ BankAF.NA = BankAF.NA %>% na.omit()
 ```
 
 ```{r}
+BankAF.scale <- BankAF.NA
+
+BankAF.scale$age <- scale(BankAF.scale$age)
+BankAF.scale$campaign <- scale(BankAF.scale$campaign)
+BankAF.scale$pdays <- scale(BankAF.scale$pdays)
+BankAF.scale$previous <- scale(BankAF.scale$previous)
+BankAF.scale$duration <- scale(BankAF.scale$duration)
+BankAF.scale$emp.var.rate <- scale(BankAF.scale$emp.var.rate)
+BankAF.scale$cons.price.idx <- scale(BankAF.scale$cons.price.idx)
+BankAF.scale$cons.conf.idx <- scale(BankAF.scale$cons.conf.idx)
+BankAF.scale$euribor3m <- scale(BankAF.scale$euribor3m)
+BankAF.scale$nr.employed <- scale(BankAF.scale$nr.employed)
+
+```
+
+
+```{r}
 # Create Train and Test sets ----
 
 # How Many yes and no?
-DimYes <- 3000 
-DimNo <- 3000
+DimYes <- 2000 
+DimNo <- 2000
 
 # Going to try to create 2 data sets, one for Subscription-yes one for Subscription-no, Sample each one proportionally then recombine into train and test sets
-BankAF.yes <- subset(BankAF.NA, Subscription == "yes")
-BankAF.no <- subset(BankAF.NA, Subscription == "no")
+BankAF.yes <- subset(BankAF.scale, Subscription == "yes")
+BankAF.no <- subset(BankAF.scale, Subscription == "no")
 
 set.seed(35)
 index.yes<-sample(1:dim(BankAF.yes)[1],DimYes,replace=F)
@@ -111,7 +128,7 @@ rm(test.no, test.yes, train.no, train.yes, BankAF.no, BankAF.yes)
 
 ```{r}
 # Creating Step Log model from original variables - full model  75/70
-full.log <- glm(Subscription ~ ., family = 'binomial', data = BankAF.NA.train[,-c(5,21)])
+full.log <- glm(Subscription ~ ., family = 'binomial', data = BankAF.NA.train[,-c(5,22)])
 step.log <- full.log %>% stepAIC(trace = FALSE)
 
 # Get predictions from Test set
@@ -140,8 +157,8 @@ confusionMatrix(class.step, BankAF.NA.test$Subscription)
 ```{r}
 # custom log regression - 61/78
 custom.log <- glm(Subscription ~ emp.var.rate + euribor3m + nr.employed + pdays + month + poutcome + contact +
-                    euribor3m*nr.employed + emp.var.rate*euribor3m,
-                  family = "binomial", data = BankAF.NA.train[,-21])
+                    euribor3m*nr.employed + emp.var.rate*euribor3m + duration,
+                  family = "binomial", data = BankAF.NA.train[,-22])
 
 summary(custom.log)
 #vif(custom.log)
@@ -172,8 +189,8 @@ confusionMatrix(class.custom, BankAF.NA.test$Subscription)
 
 ```{r}
 # Build Lasso Model on train set 74/72
-Bank.NA.Train.x <- model.matrix(Subscription ~ ., BankAF.NA.train[,-21])
-Bank.NA.Train.y <- BankAF.NA.train[,20]
+Bank.NA.Train.x <- model.matrix(Subscription ~ ., BankAF.NA.train[,-22])
+Bank.NA.Train.y <- BankAF.NA.train[,21]
 
 cvfit <- cv.glmnet(Bank.NA.Train.x, Bank.NA.Train.y, family = "binomial", type.measure = "class", nlambda = 1000)
 
@@ -193,7 +210,7 @@ cvfit$lambda.min
 finalmodel <- glmnet(Bank.NA.Train.x, Bank.NA.Train.y, family = "binomial", lambda = cvfit$lambda.min)
 
 # Get predictions from Lasso Model on Test set
-Bank.NA.Test.x <- model.matrix(Subscription ~ ., BankAF.NA.test[,-21])
+Bank.NA.Test.x <- model.matrix(Subscription ~ ., BankAF.NA.test[,-22])
 
 fit.pred.lasso <- predict(finalmodel, newx = Bank.NA.Test.x, type = "response")
 
@@ -216,8 +233,8 @@ confusionMatrix(class.lasso, BankAF.NA.test$Subscription)
 ```{r}
 # Custom Block - copy 72/72.5
 
-
-simple.log<-glm(Subscription ~ pdays+nr.employed+emp.var.rate+euribor3m,
+cutoff.simple <- 0.43
+simple.log<-glm(Subscription ~ pdays+nr.employed+emp.var.rate+euribor3m + duration,
                 family="binomial",data=BankAF.NA.train)
 
 fit.pred.simple<-predict(simple.log,newdata=BankAF.NA.test,type="response")

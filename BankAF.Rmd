@@ -91,8 +91,13 @@ names(BankAF)[21] <- "Subscription"
 # Creating an ID column to spot check train test set data
 ID <- seq(1,41188,1)
 BankAF <- cbind(BankAF, ID)
-#BankAF <- BankAF %>% mutate(SubNum = ifelse(Subscription == 'yes',1,0))
-#Maybe a new categorical for pdays: New contact v Old contact - this might be captured in previous
+
+# SubNum 1:yes 0:no
+BankAF <- BankAF %>% mutate(SubNum = ifelse(Subscription == "yes",1,0))
+
+# Creates a numeric data set for PCA
+BankAF.Numeric <- BankAF %>% dplyr::select(age, campaign, duration, pdays, previous, emp.var.rate, cons.price.idx, cons.conf.idx, euribor3m, nr.employed, SubNum)
+
 
 # Going to try to create 2 data sets, one for Subscription-yes one for Subscription-no, Sample each one proportionally then recombine into train and test sets
 BankAF.yes <- subset(BankAF, Subscription == "yes")
@@ -101,6 +106,16 @@ BankAF.no <- subset(BankAF, Subscription == "no")
 
 ```
 
+```{r}
+corr <- round(cor(BankAF.Numeric), 3)
+
+ggcorrplot(corr, hc.order = TRUE, type = "lower",
+           lab = TRUE, lab_size = 3, method = "circle",
+           colors = c("darkorchid4", "white", "springgreen3"),
+           title = "Correlations of Continous Variables",
+           ggtheme = theme_bw())
+
+```
 
 ```{r}
 str(BankAF)
@@ -111,94 +126,110 @@ summary(BankAF$previous)
 # Boxplots 
 
 # Nothing
-BankAF %>% ggplot(aes(x = log(age), fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
-  facet_wrap(facets = BankAF$Subscription) + xlab("Age") + coord_flip()
+g1 = BankAF %>% ggplot(aes(x = log(age), fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("Age") + coord_flip() + theme(legend.position = "none")
 
 # Nothing
-BankAF %>% ggplot(aes(x = log(campaign), fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
-  facet_wrap(facets = BankAF$Subscription) + xlab("campaign") + coord_flip()
+g2 = BankAF %>% ggplot(aes(x = log(campaign), fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("campaign") + coord_flip() + theme(legend.position = "none")
 
 # Nothing
-BankAF %>% ggplot(aes(x = log(pdays + 1), fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
-  facet_wrap(facets = BankAF$Subscription) + xlab("pdays") + coord_flip()
+g3 = BankAF %>% ggplot(aes(x = log(pdays + 1), fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("pdays") + coord_flip() + theme(legend.position = "none")
 
 # Nothing
-BankAF %>% ggplot(aes(x = log(previous +1), fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
-  facet_wrap(facets = BankAF$Subscription) + xlab("previous") + coord_flip()
+g4 = BankAF %>% ggplot(aes(x = log(previous +1), fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("previous") + coord_flip() + theme(legend.position = "none")
 
 # Large difference here
-BankAF %>% ggplot(aes(x = emp.var.rate, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
-  facet_wrap(facets = BankAF$Subscription) + xlab("emp.var.rate") + coord_flip()
+g5 = BankAF %>% ggplot(aes(x = emp.var.rate, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("emp.var.rate") + coord_flip() + theme(legend.position = "none")
 
 # Large Difference Here
-BankAF %>% ggplot(aes(x = cons.price.idx, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
-  facet_wrap(facets = BankAF$Subscription) + xlab("cons price") + coord_flip()
+g6 = BankAF %>% ggplot(aes(x = cons.price.idx, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("cons price") + coord_flip() + theme(legend.position = "none")
 
 # Some difference
-BankAF %>% ggplot(aes(x = cons.conf.idx, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
-  facet_wrap(facets = BankAF$Subscription) + xlab("cons conf") + coord_flip()
+g7 = BankAF %>% ggplot(aes(x = cons.conf.idx, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("cons conf") + coord_flip() + theme(legend.position = "none")
 
 # Massive difference in median
-BankAF %>% ggplot(aes(x = euribor3m, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + facet_wrap(facets = BankAF$Subscription) + xlab("euribor") + coord_flip()
+g8 = BankAF %>% ggplot(aes(x = euribor3m, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+      facet_wrap(facets = BankAF$Subscription) + xlab("euribor") + coord_flip() + theme(legend.position = "none")
 
 # Large difference
-BankAF %>% ggplot(aes(x = nr.employed, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
-  facet_wrap(facets = BankAF$Subscription) + xlab("nr.employed") + coord_flip()
+g9 = BankAF %>% ggplot(aes(x = nr.employed, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("nr.employed") + coord_flip() + theme(legend.position = "none")
 
+g10 = ggdraw() + draw_label("Continuous Variables by Subscription Decision", fontface = 'bold', x = 0, hjust = 0) + theme(plot.margin = margin(0,0,0,7))
 
+g11 = BankAF %>% ggplot(aes(x = duration/60, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+      facet_wrap(facets = BankAF$Subscription) + xlab("Duration (mins)") + coord_flip() + theme(legend.position = "none")
+
+g12 = ggdraw() + draw_label('                  Duration in Minutes --->', size = 8)
+ 
+plot_grid(g10, NULL, NULL, g1,g2,g3,g4, g5, g6, g7, g8, g9,NULL,g11, NULL ,nrow = 5, ncol = 3, rel_heights = c(0.5,2,2,2,2), align = "h")
 ```
 
 ```{r, warning = FALSE}
 # Categoricals
 #Student and Retired most likely to subscribe -  not very high in either around 25% of each
-BankAF %>% group_by(job, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
-  ggplot(aes(x = job, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+g1 = BankAF %>% group_by(job, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+      ggplot(aes(x = job, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1), legend.position = "none", axis.title.y = element_blank())
 
 # No marital status is super different single and unknown roughly 5-10% more likely than married/divorced
-BankAF %>% group_by(marital, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
-  ggplot(aes(x = marital, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+g2 = BankAF %>% group_by(marital, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+      ggplot(aes(x = marital, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1), legend.position = "none", axis.title.y = element_blank())
 
 # Illiterate nearly twice as likely to subscribe as others
-BankAF %>% group_by(education, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
-  ggplot(aes(x = education, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+g3 = BankAF %>% group_by(education, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+      ggplot(aes(x = education, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1), legend.position = "none", axis.title.y = element_blank())
 
 # Previous defaults have a 0% subscribe rate
-BankAF %>% group_by(default, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
-  ggplot(aes(x = default, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+g4 = BankAF %>% group_by(default, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+      ggplot(aes(x = default, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1), legend.position = "none", axis.title.y = element_blank())
 
 # No difference across housing
-BankAF %>% group_by(housing, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
-  ggplot(aes(x = housing, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+g5 = BankAF %>% group_by(housing, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+      ggplot(aes(x = housing, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1), legend.position = "none", axis.title.y = element_blank())
 
 # No difference across loan
-BankAF %>% group_by(loan, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
-  ggplot(aes(x = loan, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+g6 = BankAF %>% group_by(loan, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+      ggplot(aes(x = loan, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1), legend.position = "none", axis.title.y = element_blank())
 
 # Celluar contact has a much higher subscribe rate (14% vs 5%) nearly 3x!
-BankAF %>% group_by(contact, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
-  ggplot(aes(x = contact, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+g7 = BankAF %>% group_by(contact, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+      ggplot(aes(x = contact, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1), legend.position = "none", axis.title.y = element_blank())
 
 # Dec, March, Oct, Sept - Best months
-BankAF %>% group_by(month, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
-  ggplot(aes(x = month, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+g8 = BankAF %>% group_by(month, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+      ggplot(aes(x = month, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+     theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1), legend.position = "none", axis.title.y = element_blank())
 
 # Nothing
-BankAF %>% group_by(day_of_week, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
-  ggplot(aes(x = day_of_week, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+g9 = BankAF %>% group_by(day_of_week, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+      ggplot(aes(x = day_of_week, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1), legend.position = "none", axis.title.y = element_blank())
 
 # Previous success is a decent predictor of future success
-BankAF %>% group_by(poutcome, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
-  ggplot(aes(x = poutcome, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1))
+g10 = BankAF %>% group_by(poutcome, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+      ggplot(aes(x = poutcome, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1), legend.position = "none", axis.title.y = element_blank())
+
+g11 = ggdraw() + draw_label("Categorical Variables by Subscription Decision I", fontface = 'bold', x = 0, hjust = 0) + theme(plot.margin = margin(0,0,0,7))
+g12 = ggdraw() + draw_label("Categorical Variables by Subscription Decision II",  fontface = 'bold', x = 0, hjust = 0) + theme(plot.margin = margin(0,0,0,7))
+g13 = ggdraw() + draw_label("Categorical Variables by Subscription Decision III",  fontface = 'bold', x = 0, hjust = 0) + theme(plot.margin = margin(0,0,0,7))
+
+plot_grid(g11, NULL, NULL,g1,g2,g3, nrow = 2, ncol = 3, rel_heights = c(0.5,2))
+plot_grid(g12, NULL, NULL,g4,g5,g6, nrow = 2, ncol = 3, rel_heights = c(0.5,2))
+plot_grid(g13, NULL, NULL,NULL,g7,g8,g9,g10, nrow = 2, ncol = 4, rel_heights = c(0.5,2))
 ```
 
 ```{r}
@@ -239,7 +270,8 @@ na_count
 # The median age for yes is actually younger than no
 # Maybe an Age Factor variable would be better?
 
-g1 = BankAF %>% ggplot(aes(x = age)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+g1 = BankAF %>% ggplot(aes(x = age, fill = Subscription)) + geom_boxplot() +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "none") + 
   facet_wrap(facets = BankAF$Subscription) + xlab("Age") + coord_flip()
 
 g2 = BankAF %>% ggplot(aes(x = age, fill = Subscription)) + geom_histogram(binwidth = 1) + facet_wrap(~BankAF$Subscription) +
@@ -270,20 +302,33 @@ plot_grid(g1,g6,g4,g2,g5,g3, ncol = 3, nrow = 2)
 summary(BankAF$duration)
 sd(BankAF$duration)
 
-BankAF %>% ggplot(aes(x = duration)) + geom_boxplot() + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank()) + 
-  facet_wrap(facets = BankAF$Subscription) + xlab("Duration")
+g1 = BankAF %>% ggplot(aes(x = duration, fill = Subscription)) + geom_boxplot() + 
+      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "none") + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("Duration") + coord_flip()
 
-BankAF %>% ggplot(aes(x = duration, fill = Subscription)) + geom_histogram(binwidth = 50) + facet_grid(rows = BankAF$Subscription) +
-  labs(fill = "Subscription") + xlab("Duration")
+g2 = BankAF %>% ggplot(aes(x = duration, fill = Subscription)) + geom_histogram(binwidth = 50) +
+      facet_grid(rows = BankAF$Subscription) +
+      labs(fill = "Subscription") + xlab("Duration") + 
+      theme(legend.position = "none")
 
-BankAF %>% group_by(Subscription) %>% summarise(MeanDuration = mean(duration), Count = n()) %>% 
-  ggplot(aes(x = Subscription, y = MeanDuration, fill = Subscription)) + geom_col(width = 0.5) + 
-  geom_text(aes(label = round(MeanDuration,2)), vjust = -0.5, size = 3) + scale_y_continuous(limits = c(0,600), expand = c(0,0)) +
-  theme(legend.position = "none", axis.title.x = element_blank())
+g3 = BankAF %>% group_by(Subscription) %>% summarise(MeanDuration = mean(duration), Count = n()) %>% 
+      ggplot(aes(x = Subscription, y = MeanDuration, fill = Subscription)) + geom_col(width = 0.5) + 
+      geom_text(aes(label = round(MeanDuration,2)), vjust = -0.5, size = 3) + scale_y_continuous(limits = c(0,600), expand = c(0,0)) +
+      theme(legend.position = "none", axis.title.x = element_blank())
 
-BankAF %>% group_by(Subscription) %>% summarise(MedDuration = median(duration)) %>% ggplot(aes(x = Subscription, y = MedDuration, fill = Subscription)) +
-  geom_col(width = 0.5) + geom_text(aes(label = round(MedDuration,2)), vjust = -0.5, size = 3) 
+g4 = BankAF %>% group_by(Subscription) %>% 
+      summarise(MedDuration = median(duration)) %>% 
+      ggplot(aes(x = Subscription, y = MedDuration, fill = Subscription)) +
+      geom_col(width = 0.5) + geom_text(aes(label = round(MedDuration,2)), vjust = 0, size = 3) + 
+      theme(legend.position = "none")
 
+g6 = BankAF %>% ggplot(aes(sample = duration)) + stat_qq_line() + stat_qq() + xlab("Quantile") + ylab("Duration")
+
+g5 = ggdraw() + 
+  draw_label(sprintf("Summary and Distribution\n of Duration:\nMin - %s\n1st Qu. - %s\nMedian - %s\nMean - %s\n3rd Qu. - %s\nMax - %s",
+  min(BankAF$duration),summary(BankAF$duration)[2], median(BankAF$duration), round(mean(BankAF$duration),2), summary(BankAF$duration)[5], max(BankAF$duration)))
+
+plot_grid(g1,g6,g4,g2,g5,g3, ncol = 3, nrow = 2)
 ```
 
 ```{r}
@@ -317,7 +362,7 @@ g5 = ggdraw() +
                      summary(BankAF$campaign)[1], summary(BankAF$campaign)[2],
                      summary(BankAF$campaign)[3],round(summary(BankAF$campaign)[4],2),
                      summary(BankAF$campaign)[5],summary(BankAF$campaign)[6]))
-BankAF %>% group_by(Subscription) %>% dplyr::select()
+
 
 plot_grid(g1,NULL,NULL,g3,g2,NULL,NULL,g5, ncol = 4, nrow = 2, align = "h", rel_widths = c(2,0,0,3))
 ```
@@ -330,19 +375,26 @@ plot_grid(g1,NULL,NULL,g3,g2,NULL,NULL,g5, ncol = 4, nrow = 2, align = "h", rel_
 
 summary(BankAF$pdays)
 
-BankAF %>% group_by(pdays) %>% summarize(Count = n()) %>% ggplot(aes(x = pdays, y = Count)) + geom_col() +
-  ggtitle("Frequency of Pdays - Old Customers") + geom_text(aes(label = Count), vjust = -0.5, size = 2) + 
-  scale_y_continuous(limits = c(0,1000), expand = c(0,0)) + scale_x_continuous(limits = c(0, 35), expand = c(0,0)) + 
-  theme(legend.position = "none")
+g1 = BankAF %>% group_by(pdays) %>% summarize(Count = n()) %>% ggplot(aes(x = pdays, y = Count)) + geom_col() +
+      ggtitle("Frequency of Pdays - Old Customers") + geom_text(aes(label = Count), vjust = -0.5, size = 2) + 
+      scale_y_continuous(limits = c(0,1000), expand = c(0,0)) + scale_x_continuous(limits = c(0, 35), expand = c(0,0)) + 
+      theme(legend.position = "none", axis.title.y = element_blank())
 
-BankAF %>% mutate(pdays = ifelse(BankAF$pdays >= 30,30,pdays)) %>% group_by(pdays) %>% summarise(Count = n()) %>%
-  ggplot(aes(x = pdays, y = Count)) + geom_col() + geom_text(aes(label = Count), vjust = -0.5, size = 3) + 
-  ggtitle("Pdays All Clients") + xlab('Pdays (30 indicates new contact)') 
+g2 = BankAF %>% mutate(pdays = ifelse(BankAF$pdays >= 30,30,pdays)) %>% group_by(pdays) %>% summarise(Count = n()) %>%
+      ggplot(aes(x = pdays, y = Count)) + geom_col() + geom_text(aes(label = Count), vjust = 0, size = 2) + 
+      ggtitle("Pdays All Clients") + xlab('Pdays (30 indicates new contact)')  + 
+      theme(axis.title.y = element_blank())
 
-BankAF %>% filter(BankAF$pdays == 999) %>% group_by(Subscription) %>% summarise(Count = n()) %>%
-  ggplot(aes(x = Subscription, y = Count, fill = Subscription)) + geom_col(width = 0.5) + 
-  ggtitle("New Contacts by Subscription Decision") + geom_text(aes(label = Count), vjust = -0.5, size = 3) + 
-  theme(legend.position = "none")
+g3 = BankAF %>% filter(BankAF$pdays == 999) %>% group_by(Subscription) %>% summarise(Count = n()) %>%
+      ggplot(aes(x = Subscription, y = Count, fill = Subscription)) + geom_col(width = 0.5) + 
+      ggtitle("New Contacts by Subscription Decision") + geom_text(aes(label = Count), vjust = 0, size = 3) + 
+      theme(legend.position = "none", axis.title.y = element_blank())
+
+g4 = ggdraw() + 
+      draw_label(sprintf("Summary and Distribution\n of Pdays:\nMin - %s\n1st Qu. - %s\nMedian - %s\nMean - %s\n3rd Qu. - %s\nMax - %s",
+      min(BankAF$pdays),summary(BankAF$pdays)[2], median(BankAF$pdays), round(mean(BankAF$pdays),2), summary(BankAF$pdays)[5], max(BankAF$pdays)))
+
+plot_grid(NULL,NULL,g1,g2,NULL,NULL,g3,g4, nrow = 4, ncol = 2, rel_heights = c(0.25,2,0.25,2))
 ```
 
 ```{r}
@@ -350,180 +402,149 @@ BankAF %>% filter(BankAF$pdays == 999) %>% group_by(Subscription) %>% summarise(
 # previous: number of contacts performed before this campaign and for this client (numeric)
 # 
 
-summary(BankAF$previous)
+g1 = BankAF %>% ggplot(aes(x = previous, fill = Subscription)) + geom_boxplot() + 
+      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "none") + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("Previous") + coord_flip()
 
-BankAF %>% ggplot(aes(x = previous, fill = Subscription)) + geom_boxplot() + facet_grid(rows = BankAF$Subscription)
+g2 = BankAF %>% ggplot(aes(x = previous, fill = Subscription)) + geom_histogram(binwidth = 1) +
+      facet_grid(rows = BankAF$Subscription) +
+      labs(fill = "Subscription") + xlab("Previous") + 
+      theme(legend.position = "none", axis.title.y = element_blank())
 
-BankAF %>% group_by(previous, Subscription) %>% summarise(Count = n(), .groups = "drop") %>% ggplot(aes(x = previous, y = Count, fill = Subscription)) +
-  geom_col(width = 0.5) + geom_text(aes(label = Count), vjust = -0.5, size = 3) + facet_wrap(~Subscription) + theme(legend.position = "none")
+g3 = BankAF %>% ggplot(aes(sample = duration)) + stat_qq_line() + stat_qq() + xlab("Quantile") + ylab("Previous")
 
-```
+g4 = ggdraw() + 
+  draw_label(sprintf("Summary and Distribution\n of Previous:\nMin - %s\n1st Qu. - %s\nMedian - %s\nMean - %s\n3rd Qu. - %s\nMax - %s",
+  min(BankAF$previous),summary(BankAF$previous)[2], median(BankAF$previous), round(mean(BankAF$previous),2), summary(BankAF$previous)[5], max(BankAF$previous)))
 
-```{r}
-library(MASS)
-library(caret)
-
-# Full Model
-mylogit.1 <- glm(Subscription ~ ., data = BankAF.train, family = binomial)
-summary(mylogit.1)
-
-
-# Make predictions
-probabilities <- mylogit.1 %>% predict(BankAF.test, type = "response")
-predicted.classes <- ifelse(probabilities < 0.11, "no", "yes")
-# Model accuracy
-mean(predicted.classes==BankAF.test$Subscription)
-summary(probabilities)
-# Create table for conjfusion Matrix
-predTable <- tibble(Predicted = as.factor(predicted.classes), Observed = BankAF.test$Subscription)
-
-#Confusion Matrix
-confusionMatrix(predTable$Predicted, reference = predTable$Observed)
-```
-
-
-
-```{r}
-# Step Selected Model
-step.model <- mylogit.1 %>% stepAIC(trace = FALSE)
-summary(step.model)
-
-# Make predictions
-probabilities <- step.model %>% predict(BankAF.test, type = "response")
-predicted.classes <- as.factor(ifelse(probabilities > 0.091, "yes", "no"))
-# Model accuracy
-mean(predicted.classes==BankAF.test$Subscription)
-summary(probabilities)
-# Create table for conjfusion Matrix
-predTable <- tibble(Predicted = as.factor(predicted.classes), Observed = BankAF.test$Subscription)
-
-
-#Confusion Matrix
-confusionMatrix(predTable$Predicted, reference = predTable$Observed)
+plot_grid(g1,g2,g3,g4, ncol = 2, nrow = 2)
 
 ```
 
 ```{r}
-# Not working wont let me coerce to list?? 
-library(ROCR)
-results.lasso<-prediction(predicted.classes, BankAF.test$Subscription, label.ordering=c("no","yes"))
-roc.lasso = performance(results.lasso, measure = "tpr", x.measure = "fpr")
-plot(roc.lasso,colorize = TRUE)
-abline(a=0, b= 1)
-```
+# Emp.Var.Rate ----
 
- 
-```{r}
-# 
-modeltest1 <- glm(Subscription ~ emp.var.rate + cons.price.idx + cons.conf.idx + job + euribor3m + contact + month + poutcome, 
-                  data = BankAF.train, family = binomial)
-summary(modeltest1)
-vif(modeltest1)
-# Make predictions
-probabilities <- modeltest1 %>% predict(BankAF.test, type = "response")
-predicted.classes <- ifelse(probabilities > 0.1, "yes", "no")
-# Model accuracy
-sprintf("Accuracy is %s", round(mean(predicted.classes==BankAF.test$Subscription),3))
-summary(probabilities)
-# Create table for conjfusion Matrix
-predTable <- tibble(Predicted = as.factor(predicted.classes), Observed = BankAF.test$Subscription)
 
-#Confusion Matrix
-confusionMatrix(predTable$Predicted, reference = predTable$Observed)
-```
+g1 = BankAF %>% ggplot(aes(x = emp.var.rate, fill = Subscription)) + geom_boxplot() + 
+      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "none") + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("Employment Variation Rate") + coord_flip()
 
-```{r}
-# looking at individual stuff
-modeltest2 <- glm(Subscription ~ age + default + job, data = BankAF.train, family = binomial)
-summary(modeltest2)
+g2 = BankAF %>% ggplot(aes(x = emp.var.rate, fill = Subscription)) + geom_histogram(binwidth = 1) +
+      facet_grid(rows = BankAF$Subscription) +
+      labs(fill = "Subscription") + xlab("Employment Variation Rate") + 
+      theme(legend.position = "none", axis.title.y = element_blank())
 
-# Make predictions
-probabilities <- modeltest2 %>% predict(BankAF.test, type = "response")
-predicted.classes <- ifelse(probabilities > 0.25, "yes", "no")
-# Model accuracy
-sprintf("Accuracy is %s", round(mean(predicted.classes==BankAF.test$Subscription),3))
-summary(probabilities)
-# Create table for conjfusion Matrix
-predTable <- tibble(Predicted = as.factor(predicted.classes), Observed = BankAF.test$Subscription)
+g3 = BankAF %>% ggplot(aes(sample = emp.var.rate)) + stat_qq_line() + stat_qq() + xlab("Quantile") + ylab("Employment Variation Rate") + 
+      theme(axis.title.y = element_blank())
 
-#Confusion Matrix
-confusionMatrix(predTable$Predicted, reference = predTable$Observed)
-```
+g4 = ggdraw() + 
+  draw_label(sprintf("Summary and Distribution\n of Emp.var.rate:\nMin - %s\n1st Qu. - %s\nMedian - %s\nMean - %s\n3rd Qu. - %s\nMax - %s",
+  min(BankAF$emp.var.rate),summary(BankAF$emp.var.rate)[2], median(BankAF$emp.var.rate), round(mean(BankAF$emp.var.rate),2), summary(BankAF$emp.var.rate)[5],
+  max(BankAF$emp.var.rate)))
 
-```{r}
-# Principal Components Analysis Trial
-library(Lahman)
-numVars = c(1,12,13,14,16,17,18,19,20)
-
-BankAF.reduced <- BankAF[,numVars]
-cov(BankAF.reduced)
-
+plot_grid(g1,g2,g3,g4, ncol = 2, nrow = 2)
 
 ```
 
 ```{r}
-pc.result <-prcomp(BankAF.reduced, scale. = TRUE)
-pc.scores <- pc.result$x
-pairs(pc.scores)
-cor(pc.scores)
+# Cons.price.idx ----
+
+
+g1 = BankAF %>% ggplot(aes(x = cons.price.idx, fill = Subscription)) + geom_boxplot() + 
+      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "none") + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("Consumer Price Index") + coord_flip()
+
+g2 = BankAF %>% ggplot(aes(x = cons.price.idx, fill = Subscription)) + geom_histogram(binwidth = 1) +
+      facet_grid(rows = BankAF$Subscription) +
+      labs(fill = "Subscription") + xlab("Consumer Price Index") + 
+      theme(legend.position = "none", axis.title.y = element_blank())
+
+g3 = BankAF %>% ggplot(aes(sample = cons.price.idx)) + stat_qq_line() + stat_qq() + xlab("Quantile") + ylab("Consumer Price Index") + 
+      theme(axis.title.y = element_blank())
+
+g4 = ggdraw() + 
+  draw_label(sprintf("Summary and Distribution\n of Consumer Price Index:\nMin - %s\n1st Qu. - %s\nMedian - %s\nMean - %s\n3rd Qu. - %s\nMax - %s",
+  min(BankAF$cons.price.idx),summary(BankAF$cons.price.idx)[2], median(BankAF$cons.price.idx), round(mean(BankAF$cons.price.idx),2),
+  summary(BankAF$cons.price.idx)[5],max(BankAF$cons.price.idx)))
+
+plot_grid(g1,g2,g3,g4, ncol = 2, nrow = 2)
+
 ```
 
 ```{r}
-# Seems to suggest 5 or 7 PC's
-par(mfrow=c(1,2))
-eigenvals<-(pc.result$sdev)^2
-plot(1:9,eigenvals/sum(eigenvals),type="l",main="Scree Plot",ylab="Prop. Var. Explained")
-cumulative.prop<-cumsum(eigenvals/sum(eigenvals))
-plot(1:9,cumulative.prop,type="l",main="Cumulative proportion",ylim=c(0,1))
-par(mfrow=c(1,1))
+# Cons.conf.idx ----
+
+
+g1 = BankAF %>% ggplot(aes(x = cons.conf.idx, fill = Subscription)) + geom_boxplot() + 
+      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "none") + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("Consumer Confidence Index") + coord_flip()
+
+g2 = BankAF %>% ggplot(aes(x = cons.conf.idx, fill = Subscription)) + geom_histogram(binwidth = 1) +
+      facet_grid(rows = BankAF$Subscription) +
+      labs(fill = "Subscription") + xlab("Consumer confidence Index") + 
+      theme(legend.position = "none", axis.title.y = element_blank())
+
+g3 = BankAF %>% ggplot(aes(sample = cons.conf.idx)) + stat_qq_line() + stat_qq() + xlab("Quantile") + ylab("Consumer Confidence Index") + 
+      theme(axis.title.y = element_blank())
+
+g4 = ggdraw() + 
+  draw_label(sprintf("Summary and Distribution\n of Consumer Confidence Index:\nMin : %s\n1st Qu.: %s\nMedian: %s\nMean: %s\n3rd Qu.: %s\nMax: %s",
+  min(BankAF$cons.conf.idx),summary(BankAF$cons.conf.idx)[2], median(BankAF$cons.conf.idx), round(mean(BankAF$cons.conf.idx),2),
+  summary(BankAF$cons.conf.idx)[5],max(BankAF$cons.conf.idx)))
+
+plot_grid(g1,g2,g3,g4, ncol = 2, nrow = 2)
+
 ```
 
 ```{r}
-# Create Data table of the PCs and the Response
-pc.scores = data.frame(pc.scores)
-pc.scores$Subscription = BankAF$Subscription
-pc.scores = pc.scores %>% mutate(SubBin = ifelse(pc.scores$Subscription =="no",0,1))
-```
+# Euribor3m ----
 
+
+g1 = BankAF %>% ggplot(aes(x = euribor3m, fill = Subscription)) + geom_boxplot() + 
+      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "none") + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("Euribor3m") + coord_flip()
+
+g2 = BankAF %>% ggplot(aes(x = euribor3m, fill = Subscription)) + geom_histogram(binwidth = 1) +
+      facet_grid(rows = BankAF$Subscription) +
+      labs(fill = "Subscription") + xlab("Euribor3m") + 
+      theme(legend.position = "none", axis.title.y = element_blank())
+
+g3 = BankAF %>% ggplot(aes(sample = euribor3m)) + stat_qq_line() + stat_qq() + xlab("Quantile") + ylab("Euribor3m") + 
+      theme(axis.title.y = element_blank())
+
+g4 = ggdraw() + 
+  draw_label(sprintf("Summary and Distribution\n of Euribor3m:\nMin : %s\n1st Qu.: %s\nMedian: %s\nMean: %s\n3rd Qu.: %s\nMax: %s",
+  min(BankAF$euribor3m),summary(BankAF$euribor3m)[2], median(BankAF$euribor3m), round(mean(BankAF$euribor3m),2),
+  summary(BankAF$euribor3m)[5],max(BankAF$euribor3m)))
+
+plot_grid(g1,g2,g3,g4, ncol = 2, nrow = 2)
+
+```
 
 ```{r}
-ggplot(data = pc.scores, aes(x = PC1, y =  PC2)) + geom_point(aes(color = Subscription), size = 1)
-ggplot(data = pc.scores, aes(x = PC2, y =  PC3)) + geom_point(aes(color = Subscription), size = 1)
-ggplot(data = pc.scores, aes(x = PC1, y =  PC3)) + geom_point(aes(color = Subscription), size = 1)
+# nr.employed ----
 
-ggplot(data = pc.scores, aes(x = PC2, y =  PC4)) + geom_point(aes(color = Subscription), size = 1)
-ggplot(data = pc.scores, aes(x = PC3, y =  PC4)) + geom_point(aes(color = Subscription), size = 1)
-ggplot(data = pc.scores, aes(x = PC1, y =  PC4)) + geom_point(aes(color = Subscription), size = 1) # interesting case here
 
-ggplot(data = pc.scores, aes(x = PC2, y =  PC3)) + geom_point(aes(color = Subscription), size = 1)
+g1 = BankAF %>% ggplot(aes(x = nr.employed, fill = Subscription)) + geom_boxplot() + 
+      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "none") + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("Number Employed") + coord_flip()
+
+g2 = BankAF %>% ggplot(aes(x = nr.employed, fill = Subscription)) + geom_histogram(binwidth = 50) +
+      facet_grid(rows = BankAF$Subscription) +
+      labs(fill = "Subscription") + xlab("Number Employed") + 
+      theme(legend.position = "none", axis.title.y = element_blank())
+
+g3 = BankAF %>% ggplot(aes(sample = nr.employed)) + stat_qq_line() + stat_qq() + xlab("Quantile") + ylab("Number Employed") + 
+      theme(axis.title.y = element_blank())
+
+g4 = ggdraw() + 
+  draw_label(sprintf("Summary and Distribution\n of Number Employed:\nMin : %s\n1st Qu.: %s\nMedian: %s\nMean: %s\n3rd Qu.: %s\nMax: %s",
+  min(BankAF$nr.employed),summary(BankAF$nr.employed)[2], median(BankAF$nr.employed), round(mean(BankAF$nr.employed),2),
+  summary(BankAF$nr.employed)[5],max(BankAF$nr.employed)))
+
+plot_grid(g1,g2,g3,g4, ncol = 2, nrow = 2)
+
 ```
-
-```{r}
-# Models with Only PCs
-pcmodel1 <- glm(SubBin ~ PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7, data = pc.scores)
-summary(pcmodel1)
-
-# Make predictions
-probabilities <-  pcmodel1 %>% predict(pc.scores, type = "response")
-predicted.classes <- ifelse(probabilities > 0.57, "yes", "no")
-# Model accuracy
-mean(predicted.classes==pc.scores$Subscription)
-summary(probabilities)
-# Create table for conjfusion Matrix
-predTable <- tibble(Predicted = as.factor(predicted.classes), Observed = pc.scores$Subscription)
-
-#Confusion Matrix
-confusionMatrix(predTable$Predicted, reference = predTable$Observed)
-```
-
-
-
-
-
-
-
-
-
 
 
 

@@ -45,7 +45,7 @@ ID <- seq(1,41188,1)
 BankAF <- cbind(BankAF, ID)
 #BankAF <- BankAF %>% mutate(SubNum = ifelse(Subscription == 'yes',1,0))
 #Maybe a new categorical for pdays: New contact v Old contact - this might be captured in previous
-
+#BankAF.Reduced <- BankAF %>% dplyr::select(duration, job, poutcome,education, month, euribor3m, emp.var.rate, cons.price.idx, nr.employed, Subscription)
 ```
 
 ```{r}
@@ -103,9 +103,10 @@ rm(test.no, test.yes, train.no, train.yes, BankAF.no, BankAF.yes)
 # Step Model
 ```{r}
 # Creating Step Log model from original variables - full model  75/70
-full.log <- glm(Subscription ~ ., family = 'binomial', data = BankAF.train[,-c(5,22)])
+full.log <- glm(Subscription ~ (.)^2, family = 'binomial', data = BankAF.train)
 step.log <- full.log %>% stepAIC(trace = FALSE)
 
+summary(step.log)
 # Get predictions from Test set
 fit.pred.step <- predict(step.log, newdata = BankAF.test, type= "response")
 
@@ -125,7 +126,7 @@ results.step <- prediction(fit.pred.step,BankAF.test$Subscription,label.ordering
 
 class.step <- factor(ifelse(fit.pred.step > cutoff.step, 'yes','no'),levels = c('no','yes'))
 
-print("Confusion Custom")
+print("Confusion Step")
 confusionMatrix(class.step, BankAF.test$Subscription)
 ```
 
@@ -133,9 +134,8 @@ confusionMatrix(class.step, BankAF.test$Subscription)
 # Custom Model - Future Answer to Q2
 ```{r}
 # custom log regression - 61/78
-custom.log <- glm(Subscription ~ emp.var.rate + euribor3m + nr.employed + pdays + month + poutcome + contact + duration +
-                    euribor3m*nr.employed + emp.var.rate*euribor3m + duration*campaign,
-                  family = "binomial", data = BankAF.train[,-22])
+custom.log <- glm(Subscription ~ nr.employed + emp.var.rate + cons.price.idx + euribor3m + poutcome + month + duration*month + duration*poutcome + duration*job,
+                  family = "binomial", data = BankAF.train)
 
 summary(custom.log)
 #vif(custom.log)
@@ -151,7 +151,7 @@ p.yes = p %>% group_by(Subs, Preds) %>% subset(Subs == "yes")
 summary(p.no)
 summary(p.yes)
 
-cutoff.custom = 0.4
+cutoff.custom = 0.545
 
 # Lets see how we did
 results.custom <- prediction(fit.pred.custom,BankAF.test$Subscription,label.ordering=c("no","yes"))
@@ -161,14 +161,18 @@ class.custom <- factor(ifelse(fit.pred.custom >= cutoff.custom, 'yes','no'),leve
 roc.custom=performance(results.custom,measure = "tnr", x.measure = "fnr")
 
 print("Confusion Custom")
-confusionMatrix(class.custom, BankAF.test$Subscription)
+CM = confusionMatrix(class.custom, BankAF.test$Subscription)
+CM$table
+CM$overall[1]
+CM$byClass[1]
+CM$byClass[2]
 ```
 
 # Lasso Model
 ```{r}
 # Build Lasso Model on train set 74/72
-Bank.Train.x <- model.matrix(Subscription ~ ., BankAF.train[,-22])
-Bank.Train.y <- BankAF.train[,21]
+Bank.Train.x <- model.matrix(Subscription ~ ., BankAF.train[,-c(5,21)])
+Bank.Train.y <- BankAF.train[,20]
 
 cvfit <- cv.glmnet(Bank.Train.x, Bank.Train.y, family = "binomial", type.measure = "class", nlambda = 1000)
 
@@ -188,7 +192,7 @@ cvfit$lambda.min
 finalmodel <- glmnet(Bank.Train.x, Bank.Train.y, family = "binomial", lambda = cvfit$lambda.min)
 
 # Get predictions from Lasso Model on Test set
-Bank.Test.x <- model.matrix(Subscription ~ ., BankAF.test[,-22])
+Bank.Test.x <- model.matrix(Subscription ~ ., BankAF.test[,-c(5,21)])
 
 fit.pred.lasso <- predict(finalmodel, newx = Bank.Test.x, type = "response")
 
@@ -198,9 +202,9 @@ p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxpl
 
 p.no = p %>% group_by(Subs, Preds) %>% subset(Subs == "no")
 summary(p.no)
-
+coef(finalmodel)
 # Set Cutoff
-cutoff.lasso <- 0.45
+cutoff.lasso <- 0.38
 
 class.lasso <- factor(ifelse(fit.pred.lasso > cutoff.lasso, 'yes','no'),levels = c('no','yes'))
 
@@ -208,14 +212,25 @@ print("Confusion Lasso")
 confusionMatrix(class.lasso, BankAF.test$Subscription)
 ```
 
+```{r}
+# Temp training and test sets to play with
+Bank.Temp.train <- BankAF.train %>% mutate(scaleEmp = scale(emp.var.rate, scale = FALSE)) %>% mutate(scaleNR = scale(nr.employed, scale = FALSE))
+Bank.Temp.test <- BankAF.test %>% mutate(scaleEmp = scale(emp.var.rate, scale = FALSE)) %>% mutate(scaleNR = scale(nr.employed, scale = FALSE))
+rm(Bank.Temp.test, Bank.Temp.train)
+```
+
+
 # Answer to Question 1
 ```{r}
 # Custom Block - copy 72/72.5
-cutoff.simple <- 0.41
 
-simple.log<-glm(Subscription ~ pdays+nr.employed+emp.var.rate+euribor3m + duration,
+cutoff.simple <- 0.54
+
+simple.log<-glm(Subscription ~ duration + nr.employed + emp.var.rate + cons.price.idx + poutcome + month + job,
                 family="binomial",data=BankAF.train)
-
+summary(simple.log)
+#confint(simple.log, "month", 0.95)
+vif(simple.log)
 fit.pred.simple <- predict(simple.log,newdata=BankAF.test,type="response")
 
 results.simple <- prediction(fit.pred.simple,BankAF.test$Subscription,label.ordering=c("no","yes"))
@@ -229,14 +244,42 @@ p %>% group_by(Subs, Preds) %>% ggplot(aes(x = Preds, fill = Subs)) + geom_boxpl
 p.no = p %>% subset(Subs == "no")
 summary(p.no)
 
-print("Confusion Custom")
-confusionMatrix(class.simple, BankAF.test$Subscription)
-
+print("Confusion Simple")
+CM = confusionMatrix(class.simple, BankAF.test$Subscription)
+sprintf("Cutoff = %s", cutoff.simple)
+CM$table
+CM$overall[1]
+CM$byClass[1]
+CM$byClass[2]
 roc.simple=performance(results.simple,measure = "tnr", x.measure = "fnr")
 ```
 
 ```{r}
-# Creating step log model with PCs -  this didnt work at all
+# Cut off Finder - found the need to go all the way to 1
+CM.Acc <- c()
+CM.Sens <- c()
+CM.Spec <- c()
+index <- 1:2000/2000
+for (i in index){
+  
+  class.simple <- factor(ifelse(fit.pred.simple > i, 'yes','no'),levels = c('no','yes'))
+  CM = confusionMatrix(class.simple, BankAF.test$Subscription)
+ 
+  CM.Acc <- c(CM.Acc,(CM$table[1,2] + CM$table[2,1])/sum(CM$table))
+  CM.Sens <- c(CM.Sens,CM$table[2,1]/(CM$table[2,1] + CM$table[1,1]))
+  CM.Spec <- c(CM.Spec,CM$table[1,2]/(CM$table[1,2] + CM$table[2,2]))
+}
+
+plot(index,CM.Acc,type="l",col="black",ylab="Percent",xlab="Threshold for predicting Yes",ylim=c(0,1),lwd=2,main = "Interactions - With Duration")
+lines(index,CM.Sens,lty=3,col="orange",lwd=2)
+lines(index,CM.Spec,lty=5,col="blue",lwd=2)
+abline(v = .54, col = "darkorchid4")
+legend("top",legend=c("ME","FP","FN"),col=c("black","orange","blue"),lty=1,lwd=1)
+
+```
+
+```{r}
+# Creating step log model with PCs -  this didnt very well
 
 # Creates a numeric data set for PCA
 BankAF.Numeric<- BankAF %>% dplyr::select(age, campaign,pdays, previous, emp.var.rate, cons.price.idx, cons.conf.idx, euribor3m, nr.employed, SubNum)
@@ -316,12 +359,12 @@ results.step <- prediction(fit.pred.step, BankAF.test$Subscription,label.orderin
 roc.lasso = performance(results.lasso, measure = "tnr", x.measure = "fnr")
 roc.step = performance(results.step, measure = "tnr", x.measure = 'fnr')
 
-plot(roc.lasso, col = "red", lty = 1, main = "ROC")
+plot(roc.lasso, col = "red", lty = 1, main = "ROC Question 1 - Without Duration")
 plot(roc.step, col = "blue1", lty = 2, add = TRUE)
 plot(roc.simple, col = "darkgreen", lty = 3, add = TRUE)
-plot(roc.custom, col = "darkorchid4", lty = 4, add = TRUE)
+#plot(roc.custom, col = "darkorchid4", lty = 4, add = TRUE)
 abline(a=0, b= 1)
-#legend("bottomright",legend=c("Lasso","Stepwise","Custom", "PC"),col=c("red","blue","green", "darkorchid4"),lty=1,lwd=1)
+legend("bottomright",legend=c("Lasso","Stepwise","Simple"),col=c("red","blue","green"),lty=1,lwd=1)
 
 ```
 

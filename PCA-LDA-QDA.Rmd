@@ -105,44 +105,46 @@ lines(1:9,pc.cumprop,lty=3)
 
 ```{r}
 #Use ggplot2 to plot the first few pc's
-ggplot(data = pc.scores, aes(x = PC1, y = PC2)) +
+g1 = ggplot(data = pc.scores, aes(x = PC1, y = PC2)) +
   geom_point(aes(col=SubNum), size=1)+
   geom_hline(yintercept = 0, colour = "gray65") +
   geom_vline(xintercept = 0, colour = "gray65") +
-  ggtitle("PCA 1 v 2 plot")
+  ggtitle("PCA 1 v 2 plot") + theme(legend.position = "none")
 
-ggplot(data = pc.scores, aes(x = PC1, y = PC3)) +
+g2 = ggplot(data = pc.scores, aes(x = PC1, y = PC3)) +
     geom_point(aes(col=SubNum), size=1)+
   geom_hline(yintercept = 0, colour = "gray65") +
     geom_vline(xintercept = 0, colour = "gray65") +
-    ggtitle("PCA 1 v 3 plot")
+    ggtitle("PCA 1 v 3 plot")+ theme(legend.position = "none")
 
   
-ggplot(data = pc.scores, aes(x = PC2, y = PC3)) +
+g3 = ggplot(data = pc.scores, aes(x = PC2, y = PC3)) +
     geom_point(aes(col=SubNum), size=1)+
   geom_hline(yintercept = 0, colour = "gray65") +
     geom_vline(xintercept = 0, colour = "gray65") +
     ggtitle("PCA 2 v 3 plot") +
-  geom_jitter(aes(col=SubNum), size=1)
+  geom_jitter(aes(col=SubNum), size=1)+ theme(legend.position = "none")
 
-ggplot(data = pc.scores, aes(x = PC1, y = PC4)) +
+g4 = ggplot(data = pc.scores, aes(x = PC1, y = PC4)) +
     geom_point(aes(col=SubNum), size=1)+
   geom_hline(yintercept = 0, colour = "gray65") +
     geom_vline(xintercept = 0, colour = "gray65") +
     ggtitle("PCA 1 v 4 plot") +
-  geom_jitter(aes(col=SubNum), size=1)
+  geom_jitter(aes(col=SubNum), size=1)+ theme(legend.position = "none")
 
 ggplot(data = pc.scores, aes(x = PC1, y = PC6)) +
     geom_point(aes(col=SubNum), size=1)+
   geom_hline(yintercept = 0, colour = "gray65") +
     geom_vline(xintercept = 0, colour = "gray65") +
     ggtitle("PCA 2 v 4 plot") +
-  geom_jitter(aes(col=SubNum), size=1)
+  geom_jitter(aes(col=SubNum), size=1)+ theme(legend.position = "none")
+
+plot_grid(g1,g2,g3,g4, nrow = 2, ncol = 2)
 ```
 
 ```{r}
 # LDA training Model
-fit.lda <- lda(BankAF.train.y ~ ., data = BankAF.train.x)
+fit.lda <- qda(BankAF.train.y ~ ., data = BankAF.train.x)
 
 pred.lda <- predict(fit.lda, newdata = BankAF.train.x)
 
@@ -153,13 +155,30 @@ pred <- prediction(preds[,2],BankAF.train.y)
 roc.perf = performance(pred, measure = "tpr", x.measure = "fpr")
 auc.train <- performance(pred, measure = "auc")
 auc.train <- auc.train@y.values
-plot(roc.perf)
+plot(roc.perf, main = "QDA Train - No Duration")
 abline(a=0, b= 1)
 text(x = .40, y = .6,paste("AUC = ", round(auc.train[[1]],3), sep = ""))
+
+
+
+
 
 ```
 
 ```{r}
+pred.qda <- predict(fit.lda, newdata = BankAF.test.x)
+
+preds1 <- pred.qda$posterior
+preds1 <- as.data.frame(preds1)
+
+pred1 <- prediction(preds1[,2],BankAF.test.y)
+roc.perf = performance(pred1, measure = "tpr", x.measure = "fpr")
+auc.train <- performance(pred1, measure = "auc")
+auc.train <- auc.train@y.values
+plot(roc.perf, main = "QDA Test -  No Duration")
+abline(a=0, b= 1)
+text(x = .40, y = .6,paste("AUC = ", round(auc.train[[1]],3), sep = ""))
+
 
 ```
 
