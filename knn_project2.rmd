@@ -1,0 +1,86 @@
+---
+title: "stats2_project2_knn"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(class)
+library(caret)
+library(e1071)
+library(ggplot2)
+library(dplyr)
+```
+
+## R Markdown
+
+
+```{r}
+BankAF <- read.csv(file = "~/Documents/Stats-2-Project-2/bank-additional-full.csv", sep = ";", header = TRUE)
+
+head(BankAF)
+
+names(BankAF)[21] <- "Subscription"
+
+BankAF %>% mutate(emp_flag = ifelse(job %in% c("admin.","blue-collar","entrepreneur","housemaid","management","self-employed","services","technician","unknown"), 1,0)) -> BankAF 
+BankAF %>% mutate(loan_flag = ifelse(loan == 'yes',1,0)) -> BankAF
+BankAF %>% mutate(default_flag = ifelse(default == 'yes' ,1,0)) -> BankAF
+BankAF %>% mutate(housing_loan_flag = ifelse(housing == 'yes',1,0)) -> BankAF
+BankAF %>% mutate(marital_flag = ifelse(marital == 'married',1,0)) -> BankAF
+BankAF %>% mutate(poutcome_flag = ifelse(poutcome == 'success',1,0)) -> BankAF
+```
+
+## Train and Test sets
+
+
+```{r}
+BankAF.yes <- subset(BankAF, Subscription == "yes")
+BankAF.no <- subset(BankAF, Subscription == "no")
+
+set.seed(35)
+index.yes<-sample(1:dim(BankAF.yes)[1],floor(0.8*dim(BankAF.yes)),replace=F)
+train.yes<-BankAF.yes[index.yes,]
+test.yes<-BankAF.yes[-index.yes,]
+
+index.no<-sample(1:dim(BankAF.no)[1],floor(0.5*dim(BankAF.no)),replace=F)
+train.no<-BankAF.no[index.no,]
+test.no<-BankAF.no[-index.no,]
+
+BankAF.train <- rbind(train.no, train.yes)
+BankAF.test <- rbind(test.no, test.yes)
+```
+
+## Running KNN
+```{r}
+
+accs = data.frame(accuracy = numeric(30), k = numeric(30), sensitivity = numeric(30), specificity = numeric(30))
+
+for(i in 1:30)
+{
+  classifications = knn(BankAF.train[,c(1,11,12,13,14,16,17,18,19,20,22,23,24,25,26,27)],BankAF.test[,c(1,11,12,13,14,16,17,18,19,20,22,23,24,25,26,27)],BankAF.train$Subscription, prob = TRUE, k = i)
+
+  CM = confusionMatrix(table(classifications,BankAF.test$Subscription))
+  accs$accuracy[i] = CM$overall[1]
+  accs$sensitivity[i] = CM$byClass[1]
+  accs$specificity[i] = CM$byClass[2]
+  accs$k[i] = i
+}
+```
+
+
+## Plots
+
+```{r}
+library("reshape2")
+
+accs -> accs2
+
+accs <- melt(accs, id.vars="k", measure.vars= c("accuracy","sensitivity","specificity"))
+
+ggplot(data=accs, aes(x=k, y=value, group = variable, colour = variable)) +
+    geom_line() +
+    geom_point( size=4, shape=21, fill="white") +
+    ggtitle('KNN stats')
+
+```
+
