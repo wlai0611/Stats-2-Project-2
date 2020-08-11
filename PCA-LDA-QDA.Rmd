@@ -152,7 +152,7 @@ plot_grid(g1,g2,g3,g4, nrow = 2, ncol = 2)
 ```
 
 ```{r}
-# LDA training Model
+# QDA training Model -  not running on PCs using actual variables
 fit.qda <- qda(BankAF.train.y ~ ., data = BankAF.train.x)
 
 pred.qda <- predict(fit.qda, newdata = BankAF.train.x)
@@ -185,5 +185,9 @@ abline(a=0, b= 1)
 text(x = .40, y = .6,paste("AUC = ", round(auc.train[[1]],3), sep = ""))
 
 
+```
+
+```{r}
+heplots::covEllipses(BankAF.train.x[,1:10], BankAF.train.y, variables = c(1:10))
 ```
 
