@@ -134,7 +134,7 @@ g2 = BankAF %>% ggplot(aes(x = log(campaign), fill = Subscription)) + geom_boxpl
       facet_wrap(facets = BankAF$Subscription) + xlab("campaign") + coord_flip() + theme(legend.position = "none")
 
 # Nothing
-g3 = BankAF %>% ggplot(aes(x = log(pdays + 1), fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+g3 = BankAF %>% ggplot(aes(x = pdays, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
       facet_wrap(facets = BankAF$Subscription) + xlab("pdays") + coord_flip() + theme(legend.position = "none")
 
 # Nothing
@@ -169,6 +169,33 @@ g11 = BankAF %>% ggplot(aes(x = duration/60, fill = Subscription)) + geom_boxplo
 g12 = ggdraw() + draw_label('                  Duration in Minutes --->', size = 8)
  
 plot_grid(g10, NULL, NULL, g1,g2,g3,g4, g5, g6, g7, g8, g9,NULL,g11, NULL ,nrow = 5, ncol = 3, rel_heights = c(0.5,2,2,2,2), align = "h")
+```
+```{r}
+# Simple Model Graphics
+
+g1 = BankAF %>% ggplot(aes(x = (duration/60), fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("Duration (minutes)") + coord_flip() + theme(legend.position = "none")
+
+g2 = BankAF %>% ggplot(aes(x = nr.employed, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("Number Employed") + coord_flip() + theme(legend.position = "none")
+
+g3 = BankAF %>% ggplot(aes(x = emp.var.rate, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("Employee Variation Rate") + coord_flip() + theme(legend.position = "none")
+
+g4 = BankAF %>% ggplot(aes(x = cons.price.idx, fill = Subscription)) + geom_boxplot() + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + 
+      facet_wrap(facets = BankAF$Subscription) + xlab("Consumer Price Index") + coord_flip() + theme(legend.position = "none")
+
+g5 = BankAF %>% group_by(month, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+      ggplot(aes(x = month, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1), legend.position = "none", axis.title.y = element_blank())
+
+g6 = BankAF %>% group_by(poutcome, Subscription) %>% summarise(count = n()) %>% mutate(Perc = (count/sum(count))) %>% 
+      ggplot(aes(x = poutcome, y = Perc, fill = Subscription)) + geom_bar(stat = "identity") + 
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.65, hjust = 1), legend.position = "none", axis.title.y = element_blank())
+
+g7 = ggdraw() + draw_label("Variables Used in Simple Model", fontface = 'bold', x = 0, hjust = 0) + theme(plot.margin = margin(0,0,0,7))
+
+plot_grid(g7,NULL, NULL,g1,g2,g3,g4,g5,g6, nrow = 3, ncol = 3, rel_heights = c(0.25,1,1))
 ```
 
 ```{r, warning = FALSE}
@@ -550,6 +577,9 @@ plot_grid(g1,g2,g3,g4, ncol = 2, nrow = 2)
 
 
 
+```{r}
+BankAF %>% subset(Subscription == "no") %>% summarise(medDur = median(duration), meanDur = mean(duration))
+```
 
 
 
