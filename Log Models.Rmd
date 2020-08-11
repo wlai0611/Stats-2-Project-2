@@ -34,7 +34,8 @@ library(car)
 # Grab the file Bank Additional Full - Fill in your file
 BankAF <- read.csv(file = "F:/R For Real/Stats-2-Project-2/bank-additional-full.csv", sep = ";", header = TRUE)
 
-# removing obs 36044
+# removing obs 36044 - was a large outlier due to a few things: Had previous success, was on the call for an hour, emp rate was low, and nr employed was low
+# still a no answer
 BankAF <- BankAF[-36044,]
 
 # Change the name of the response from y to Subscription
@@ -43,7 +44,7 @@ names(BankAF)[21] <- "Subscription"
 # SubNum 1:yes 0:no
 BankAF <- BankAF %>% mutate(SubNum = ifelse(Subscription == "yes",1,0))
 
-# Creating an ID column to spot check train test set data
+# Creating an ID column to spot check train test set data - if you have removed observation 36044 then set the sequence to 41187, otherwise 41188
 ID <- seq(1,41187,1)
 BankAF <- cbind(BankAF, ID)
 
@@ -139,16 +140,18 @@ class.step <- factor(ifelse(fit.pred.step > cutoff.step, 'yes','no'),levels = c(
 
 print("Confusion Step")
 confusionMatrix(class.step, BankAF.test$Subscription)
-```
 
-```{r}
-# observation 36044 was on the call for a duration of 3509 secs, just short of an hour and still had a no response 
+
+# Residuals
 plot(step.log)
 ```
 
 ```{r}
-plot(custom.log)
+# observation 36044 was on the call for a duration of 3509 secs, just short of an hour and still had a no response 
+plot(simple.log)
+
 ```
+
 
 # Custom Model - Future Answer to Q2
 ```{r}
@@ -185,6 +188,9 @@ CM$table
 CM$overall[1]
 CM$byClass[1]
 CM$byClass[2]
+
+# residuals
+plot(custom.log)
 ```
 
 # Lasso Model
@@ -273,6 +279,9 @@ CM$overall[1]
 CM$byClass[1]
 CM$byClass[2]
 roc.simple=performance(results.simple,measure = "tnr", x.measure = "fnr")
+
+# Residuals
+plot(simple.log)
 ```
 
 ```{r}
