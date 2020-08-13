@@ -397,38 +397,52 @@ abline(a=0, b= 1)
 legend("bottomright",legend=c("Lasso","Stepwise","Simple"),col=c("red","blue","green"),lty=1,lwd=1)
 
 ```
-
-Vanilla Train Test
+Function for categorizing continuous variable into vector of categories
 ```{r}
-index_train<-sample(1:dim(BankAF)[1],floor(0.75*dim(BankAF)),replace=F)
-bank_train<-BankAF[index_train,]
-bank_test<-BankAF[-index_train,]
-```
-
-```{r}
-multivar_log=glm(Subscription~pdays+nr.employed+emp.var.rate+euribor3m,
-                 family='binomial',
-                 data=bank_train)
-probabilities<-predict(multivar_log,newdata=bank_test[,names(bank_test)!='Subscription']
-                       ,type="response")
-BankAF.yes <- subset(BankAF, Subscription == "yes")
-BankAF.no <- subset(BankAF, Subscription == "no")
-cutoff=nrow(BankAF.yes)/nrow(BankAF)
-classifications<-factor(ifelse(probabilities>cutoff,"yes","no"),levels=c("no","yes"))
-confusion=table(classifications,bank_test[,'Subscription'])
-mean(classifications==bank_test[,'Subscription'])
-true_positive=confusion[2,2]/sum(confusion[,2])
-true_negative=confusion[1,1]/sum(confusion[,1])
-print("True positive rate is %s")
-true_positive
-print("True negative rate is %s")
-true_negative
-
-confusionMatrix(confusion)
+bin=function(residNorm,numBins=5)
+{
+  rangeResid=range(residNorm)[2]-range(residNorm)[1]
+  # we want equally spaced numbbers from start to end if we wanted 3 bins... & range of 30
+  # we would identify interval space first, 30/numbins = 10
+  interval=rangeResid/(numBins)
+  binLimits=seq(range(residNorm)[1],range(residNorm)[2],interval)
+  #sort the resids and put the resid labelled as the binLimit that is right before the
+  #residNorm=residNorm[order(residNorm)]
+  binArray=double(length(residNorm))
+  #for each residNorm find the maximum binLimits it is greater than and assign it that limit
+  for(i in 1:length(binArray)){
+    res=residNorm[i]
+    binArray[i]=ifelse(max(binLimits[which(binLimits<res)])==-Inf,binLimits[1],
+                       max(binLimits[which(binLimits<res)]))
+  }
+  binArray = binArray + (interval/2)
+  return(binArray)
+}
 ```
 
 
+```{r}
+simple.log<-glm(Subscription ~  nr.employed + emp.var.rate + cons.price.idx + poutcome + month ,
+                family="binomial",data=BankAF.train)
 
+
+BankAF.train['fitted.values'] = simple.log$fitted.values
+prob_bin=bin(BankAF.train$fitted.values,10000)
+BankAF.train['predicted_bin']=prob_bin
+BankAF.train %>% group_by(predicted_bin) %>%
+  summarise(prob_yes=mean(Subscription=='yes'),num_obs=n()) %>%
+  ggplot() +
+  geom_point(aes(predicted_bin,prob_yes-predicted_bin,size=num_obs))+
+  ylab('Residual (Actual Prob - Predicted Prob)')+
+  xlab('Predicted Probability')+
+  geom_text(aes(predicted_bin,prob_yes-predicted_bin,size=num_obs,label='a'))
+
+
+```
+Delete the added columns
+```{r}
+BankAF.train=BankAF.train[,!(names(BankAF.train) %in% c('predicted_bin','fitted.values'))]
+```
 
 
 
